@@ -18,3 +18,4 @@ greenlet
 bcrypt
 itsdangerous
 keyring
+pydantic[email]

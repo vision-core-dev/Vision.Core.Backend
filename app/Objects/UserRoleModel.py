@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel
 from sqlalchemy import func, UUID, Column, String, ARRAY, TEXT, DateTime
@@ -20,13 +21,21 @@ class UserRole(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
 
+class SmallUserRoleBase(BaseModel):
+    id: uuid.UUID
+    key: str
+    name: str
+    class Config:
+        from_attributes = True
+
 class UserRoleBase(BaseModel):
     id: uuid.UUID
     key: str
     name: str
     menu: list[str]
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 

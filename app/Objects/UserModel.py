@@ -3,9 +3,11 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel
-from sqlalchemy import Column, String, DateTime, UUID, func, ARRAY
+from sqlalchemy import Column, String, DateTime, UUID, func, ARRAY, ForeignKey, Boolean, sql
+from sqlalchemy.orm import relationship, backref
 
 from app.Infrastructure.Database import Base
+from app.Objects.UserRoleModel import UserRoleBase, SmallUserRoleBase
 
 
 class User(Base):
@@ -17,7 +19,12 @@ class User(Base):
     email = Column(String(100), unique=True, nullable=True)
     hashed_password = Column(String(255), nullable=True)
 
-    role_id = Column(String(50), nullable=False)
+    is_active = Column(Boolean, nullable=False, server_default=sql.expression.true())
+
+    # ✅ Додаємо ForeignKey до UserRoles.id
+    role_id = Column(UUID(as_uuid=True), ForeignKey("UserRoles.id", ondelete="SET NULL"), nullable=True)
+    role = relationship("UserRole", backref=backref("users", lazy="selectin"))
+
     supervisor_ids = Column(ARRAY(UUID(as_uuid=True)), nullable=True, default=[])
 
     # Profile
@@ -33,6 +40,20 @@ class User(Base):
     # Audit
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
+
+
+
+
+class SmallUserBase(BaseModel):
+    id: uuid.UUID
+    email: str | None
+    first_name: str | None
+    last_name: str | None
+    avatar_url: str | None
+    role: Optional[SmallUserRoleBase] = None
+    created_at: datetime
+    class Config:
+        from_attributes = True
 
 class UserBase(BaseModel):
     id: uuid.UUID

@@ -19,6 +19,7 @@ class LoginResponse(BaseModel):
 
 class RegisterUserResponse(BaseModel):
     ok: bool
+    user_id: uuid.UUID
     email: str
     password: str
 

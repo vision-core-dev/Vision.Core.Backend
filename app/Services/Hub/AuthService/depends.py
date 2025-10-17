@@ -46,20 +46,22 @@ async def getuser(
 async def _get_user_by_token(
     db: AsyncSession,
     token: uuid.UUID,
-    raise_on_none: bool = True
 ):
     q = select(User).filter(User.temp_token == token)
 
     result = await db.execute(q)
     user = result.scalar_one_or_none()
 
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="user_is_deactivated",
+        )
+
     if not user:
-        if raise_on_none:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="invalid_or_expired_token",
-            )
-        else:
-            return None
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="user_not_found",
+        )
 
     return user

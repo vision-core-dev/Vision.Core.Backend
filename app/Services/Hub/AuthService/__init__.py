@@ -101,6 +101,7 @@ class AuthService:
         new_user = User(
             email=email,
             hashed_password=get_hashed_password(password),
+            is_active=True,
             first_name=first_name,
             role_id=str(default_role.id),
             supervisor_ids=[],
@@ -110,4 +111,4 @@ class AuthService:
         await self.db.commit()
         await self.db.refresh(new_user)
 
-        return RegisterUserResponse(ok=True, email=email, password=password)
+        return RegisterUserResponse(ok=True, user_id=new_user.id, email=email, password=password)

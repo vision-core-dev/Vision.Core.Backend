@@ -31,15 +31,15 @@ class User(Base):
     first_name = Column(String(100), nullable=False)
     last_name = Column(String(100), nullable=True)
     avatar_url = Column(String(255), nullable=True)
-    birthday = Column(DateTime, nullable=True)
+    birthday = Column(DateTime(timezone=True), nullable=True)
 
     # Session / identity
     temp_token = Column(UUID(as_uuid=True), unique=True, nullable=True)
-    last_login = Column(DateTime, nullable=True)
+    last_login = Column(DateTime(timezone=True), nullable=True)
 
     # Audit
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), default=datetime.now(), onupdate=datetime.now())
 
 
 
@@ -63,6 +63,7 @@ class UserBase(BaseModel):
     avatar_url: str | None
     birthday: datetime | None
     temp_token: uuid.UUID | None
+    last_login: datetime | None
     created_at: datetime
     updated_at: datetime
     class Config:

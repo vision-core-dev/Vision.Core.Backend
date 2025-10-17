@@ -29,6 +29,9 @@ class CreateUserResponse(BaseModel):
 class UserDetailsResponse(BaseModel):
     ok: bool
     user: UserBase
+    actions: list[str] = []
+    supervisors: list[SmallUserBase] = []
+    subordinates: list[SmallUserBase] = []
 
     class Config:
         from_attributes = True

@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel
-from sqlalchemy import func, UUID, Column, String, ARRAY, TEXT, DateTime
+from sqlalchemy import func, UUID, Column, String, ARRAY, TEXT, DateTime, Integer
 
 from app.Infrastructure.Database import Base
 
@@ -16,10 +16,10 @@ class UserRole(Base):
     name = Column(String(50), unique=True, nullable=False)
 
     menu = Column(ARRAY(TEXT), nullable=False, default=[])
-    # ["dashboard", "profile", "settings"]
+    order = Column(Integer, nullable=False, default=0)
 
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), default=datetime.now(), onupdate=datetime.now())
 
 class SmallUserRoleBase(BaseModel):
     id: uuid.UUID

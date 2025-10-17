@@ -1,7 +1,8 @@
 import uuid
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from pydantic import EmailStr
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.Objects.UserModel import User, MeUserBase
@@ -50,20 +51,6 @@ class AuthService:
         if not user:
             raise HTTPException(status_code=400, detail="user_not_found")
 
-        # 🧠 Якщо у користувача ще немає ролі — призначаємо "default"
-        if not user.role_id:
-            default_role_result = await self.db.execute(
-                select(UserRole).where(UserRole.key == "default")
-            )
-            default_role = default_role_result.scalar_one_or_none()
-
-            if not default_role:
-                raise HTTPException(status_code=500, detail="default_role_not_found")
-
-            user.role_id = str(default_role.id)
-            await self.db.commit()
-            await self.db.refresh(user)
-
         # 🔎 Отримуємо роль користувача
         role_result = await self.db.execute(
             select(UserRole).where(UserRole.id == user.role_id)
@@ -73,13 +60,17 @@ class AuthService:
         if not role:
             raise HTTPException(status_code=404, detail="role_not_found")
 
+        user.last_login = func.now()
+        await self.db.commit()
+        await self.db.refresh(user)
+
         return CheckMeResponse(
             ok=True,
             user=MeUserBase.from_orm(user),
             role=MyUserRoleBase.from_orm(role),
         )
 
-    async def RegisterUser(self, email: str, password: str, first_name: str = "Name") -> RegisterUserResponse:
+    async def RegisterUser(self, email: str | EmailStr, password: str, first_name: str = "Name") -> RegisterUserResponse:
         if not email or not password:
             raise HTTPException(status_code=400, detail="provide_email_and_password")
 

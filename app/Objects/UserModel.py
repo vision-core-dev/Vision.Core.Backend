@@ -60,6 +60,7 @@ class UserBase(BaseModel):
     email: str | None
     first_name: str | None
     last_name: str | None
+    role: Optional[UserRoleBase] = None
     avatar_url: str | None
     birthday: datetime | None
     temp_token: uuid.UUID | None

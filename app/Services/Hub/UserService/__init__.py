@@ -45,6 +45,7 @@ class UserService:
         actions = []
         if actor_role.order < target_role.order:
             actions.append("change_role")
+            actions.append("change_org_structure")
             if user.is_active:
                 actions.append("deactivate_user")
             else:
@@ -99,26 +100,96 @@ class UserService:
             badges=badges  # 👈 нове поле
         )
 
-    async def DeactivateUser(self, user_id: uuid.UUID) -> DeactivateUserResponse:
+    async def ChangeUserRole(self, user_id: uuid.UUID, new_role_id: uuid.UUID, actor: User) -> UserDetailsResponse:
         result = await self.db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
 
         if not user:
             raise HTTPException(status_code=404, detail="user_not_found")
+
+        actor_role = await self.db.get(UserRole, actor.role_id)
+        target_role = await self.db.get(UserRole, user.role_id)
+        new_role = await self.db.get(UserRole, new_role_id)
+
+        if not new_role:
+            raise HTTPException(status_code=404, detail="role_not_found")
+
+        if actor_role.order < target_role.order and actor_role.order < new_role.order:
+            user.role_id = str(new_role.id)
+            await self.db.commit()
+            await self.db.refresh(user)
+            return await self.GetUserDetails(user_id, actor)
+        else:
+            raise HTTPException(status_code=403, detail="insufficient_permissions")
+
+    async def DeactivateUser(self, user_id: uuid.UUID, actor: User) -> DeactivateUserResponse:
+        result = await self.db.execute(select(User).options(selectinload(User.role)).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="user_not_found")
+
+        actor_role = await self.db.get(UserRole, actor.role_id)
+
+        if user.role.order < actor_role.order:
+            raise HTTPException(status_code=403, detail="insufficient_permissions")
 
         user.is_active = False
         await self.db.commit()
 
         return DeactivateUserResponse(user_id=user.id)
 
-    async def ActivateUser(self, user_id: uuid.UUID) -> ActivateUserResponse:
-        result = await self.db.execute(select(User).where(User.id == user_id))
+    async def ActivateUser(self, user_id: uuid.UUID, actor: User) -> ActivateUserResponse:
+        result = await self.db.execute(select(User).options(selectinload(User.role)).where(User.id == user_id))
         user = result.scalar_one_or_none()
 
         if not user:
             raise HTTPException(status_code=404, detail="user_not_found")
 
+        actor_role = await self.db.get(UserRole, actor.role_id)
+
+        if user.role.order < actor_role.order:
+            raise HTTPException(status_code=403, detail="insufficient_permissions")
+
         user.is_active = True
         await self.db.commit()
 
         return ActivateUserResponse(user_id=user.id)
+
+    async def AddSupervisor(self, user_id: uuid.UUID, supervisor_id: uuid.UUID, actor: User):
+        user = await self.db.get(User, user_id)
+        supervisor = await self.db.get(User, supervisor_id)
+        if not user or not supervisor:
+            raise HTTPException(status_code=404, detail="user_not_found")
+
+        if supervisor_id not in (user.supervisor_ids or []):
+            user.supervisor_ids = (user.supervisor_ids or []) + [supervisor_id]
+            await self.db.commit()
+        return await self.GetUserDetails(user_id, actor)
+
+    async def RemoveSupervisor(self, user_id: uuid.UUID, supervisor_id: uuid.UUID, actor: User):
+        user = await self.db.get(User, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="user_not_found")
+
+        user.supervisor_ids = [sid for sid in (user.supervisor_ids or []) if sid != supervisor_id]
+        await self.db.commit()
+        return await self.GetUserDetails(user_id, actor)
+
+    async def AddSubordinate(self, user_id: uuid.UUID, subordinate_id: uuid.UUID, actor: User):
+        subordinate = await self.db.get(User, subordinate_id)
+        if not subordinate:
+            raise HTTPException(status_code=404, detail="user_not_found")
+
+        subordinate.supervisor_ids = (subordinate.supervisor_ids or []) + [user_id]
+        await self.db.commit()
+        return await self.GetUserDetails(user_id, actor)
+
+    async def RemoveSubordinate(self, user_id: uuid.UUID, subordinate_id: uuid.UUID, actor: User):
+        subordinate = await self.db.get(User, subordinate_id)
+        if not subordinate:
+            raise HTTPException(status_code=404, detail="user_not_found")
+
+        subordinate.supervisor_ids = [sid for sid in (subordinate.supervisor_ids or []) if sid != user_id]
+        await self.db.commit()
+        return await self.GetUserDetails(user_id, actor)

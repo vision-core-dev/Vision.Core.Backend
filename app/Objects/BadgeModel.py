@@ -32,7 +32,7 @@ class UserBadge(Base):
     awarded_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class UserBadgeBase(BaseModel):
-    id: uuid.UUID
+    id: uuid.UUID       
     name: str
     description: str | None
     icon_url: str | None

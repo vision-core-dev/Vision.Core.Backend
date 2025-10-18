@@ -63,6 +63,7 @@ class UserBase(BaseModel):
     role: Optional[UserRoleBase] = None
     avatar_url: str | None
     birthday: datetime | None
+    is_active: bool
     temp_token: uuid.UUID | None
     last_login: datetime | None
     created_at: datetime

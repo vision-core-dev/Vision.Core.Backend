@@ -3,6 +3,7 @@ import uuid
 from fastapi import Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.Infrastructure.Database import getdb
 from app.Objects.UserModel import User
@@ -47,7 +48,11 @@ async def _get_user_by_token(
     db: AsyncSession,
     token: uuid.UUID,
 ):
-    q = select(User).filter(User.temp_token == token)
+    q = (
+        select(User)
+        .options(selectinload(User.role))  # ✅ роль одразу підвантажується
+        .filter(User.temp_token == token)
+    )
 
     result = await db.execute(q)
     user = result.scalar_one_or_none()
@@ -63,5 +68,8 @@ async def _get_user_by_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="user_not_found",
         )
+
+    _ = user.role.order
+
 
     return user

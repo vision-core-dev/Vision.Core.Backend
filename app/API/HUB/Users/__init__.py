@@ -37,8 +37,28 @@ async def get_user(user_id: uuid.UUID, user: User = Depends(getuser), db: AsyncS
 
 @users_router.post("/{user_id}/Deactivate")
 async def delete_user(user_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
-    return await UserService(db).DeactivateUser(user_id)
+    return await UserService(db).DeactivateUser(user_id, user)
 
 @users_router.post("/{user_id}/Activate")
 async def delete_user(user_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
-    return await UserService(db).ActivateUser(user_id)
+    return await UserService(db).ActivateUser(user_id, user)
+
+@users_router.post("/{user_id}/ChangeRole/{new_role_id}")
+async def change_user_role(user_id: uuid.UUID, new_role_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    return await UserService(db).ChangeUserRole(user_id, new_role_id, user)
+
+@users_router.post("/{user_id}/Supervisors/Add/{supervisor_id}")
+async def add_supervisor(user_id: uuid.UUID, supervisor_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    return await UserService(db).AddSupervisor(user_id, supervisor_id, user)
+
+@users_router.post("/{user_id}/Supervisors/Remove/{supervisor_id}")
+async def remove_supervisor(user_id: uuid.UUID, supervisor_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    return await UserService(db).RemoveSupervisor(user_id, supervisor_id, user)
+
+@users_router.post("/{user_id}/Subordinates/Add/{subordinate_id}")
+async def add_subordinate(user_id: uuid.UUID, subordinate_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    return await UserService(db).AddSubordinate(user_id, subordinate_id, user)
+
+@users_router.post("/{user_id}/Subordinates/Remove/{subordinate_id}")
+async def remove_subordinate(user_id: uuid.UUID, subordinate_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    return await UserService(db).RemoveSubordinate(user_id, subordinate_id, user)

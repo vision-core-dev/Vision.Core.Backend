@@ -3,8 +3,9 @@ from fastapi import HTTPException
 from pydantic import EmailStr
 from sqlalchemy import select, any_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
+from app.Objects.BadgeModel import UserBadge, Badge, UserBadgeBase
 from app.Objects.UserModel import User
 from app.Objects.UserRoleModel import UserRole
 from app.Services.Hub.AuthService import AuthService
@@ -52,7 +53,7 @@ class UserService:
             actions.append("give_badge")
             actions.append("remove_badge")
 
-        # 🧑‍💼 Отримуємо керівників
+        # 🧑‍💼 Керівники
         supervisors = []
         if user.supervisor_ids:
             q = await self.db.execute(
@@ -60,7 +61,7 @@ class UserService:
             )
             supervisors = q.scalars().all()
 
-        # 👨‍💻 Отримуємо підлеглих
+        # 👨‍💻 Підлеглі
         q2 = await self.db.execute(
             select(User)
             .where(user.id == any_(User.supervisor_ids))
@@ -68,11 +69,34 @@ class UserService:
         )
         subordinates = q2.scalars().all()
 
+        # 🏅 Бейджі користувача (інтегровано тут)
+        badge_stmt = (
+            select(UserBadge)
+            .where(UserBadge.user_id == user.id)
+            .options(joinedload(UserBadge.badge))  # ✅ тепер це працює
+        )
+
+        badge_result = await self.db.execute(badge_stmt)
+        user_badges = badge_result.scalars().all()
+
+        badges = [
+            UserBadgeBase(
+                id=ub.badge.id,
+                name=ub.badge.name,
+                description=ub.badge.description,
+                icon_url=ub.badge.icon_url,
+                emoji=ub.badge.emoji,
+                awarded_at=ub.awarded_at
+            )
+            for ub in user_badges
+        ]
+
         return UserDetailsResponse(
             user=user,
             actions=actions,
             supervisors=supervisors,
-            subordinates=subordinates
+            subordinates=subordinates,
+            badges=badges  # 👈 нове поле
         )
 
     async def DeactivateUser(self, user_id: uuid.UUID) -> DeactivateUserResponse:

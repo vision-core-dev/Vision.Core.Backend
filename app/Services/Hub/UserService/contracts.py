@@ -3,6 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, EmailStr
 
+from app.Objects.BadgeModel import UserBadgeBase
 from app.Objects.UserModel import SmallUserBase, UserBase
 
 
@@ -29,6 +30,7 @@ class UserDetailsResponse(BaseModel):
     actions: list[str] = []
     supervisors: list[SmallUserBase] = []
     subordinates: list[SmallUserBase] = []
+    badges: list[UserBadgeBase] = []
 
     class Config:
         from_attributes = True

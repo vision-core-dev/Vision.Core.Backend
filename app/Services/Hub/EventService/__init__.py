@@ -13,7 +13,7 @@ class EventService:
             select(Event)
         )
         events = result.scalars().all()
-        return ListEventsResponse(ok=True, total=len(events), events=events)
+        return ListEventsResponse(total=len(events), list=events)
 
     async def CreateEvent(self, data: CreateEventRequest) -> CreateEventResponse:
         new_event = Event(
@@ -29,5 +29,5 @@ class EventService:
         await self.db.commit()
         await self.db.refresh(new_event)
 
-        return CreateEventResponse(ok=True, event_id=str(new_event.id))
+        return CreateEventResponse(event_id=str(new_event.id))
 

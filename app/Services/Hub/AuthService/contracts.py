@@ -14,16 +14,13 @@ class LoginRequest(BaseModel):
     password: str
 
 class LoginResponse(BaseModel):
-    ok: bool
     token: str | uuid.UUID
 
 class RegisterUserResponse(BaseModel):
-    ok: bool
     user_id: uuid.UUID
     email: str
     password: str
 
 class CheckMeResponse(BaseModel):
-    ok: bool
     user: MeUserBase
     role: MyUserRoleBase

@@ -13,10 +13,8 @@ class CreateEventRequest(BaseModel):
     location: str | None = None
 
 class CreateEventResponse(BaseModel):
-    ok: bool
     event_id: str
 
 class ListEventsResponse(BaseModel):
-    ok: bool
     total: int
-    events: list[EventBase]
+    list: list[EventBase]

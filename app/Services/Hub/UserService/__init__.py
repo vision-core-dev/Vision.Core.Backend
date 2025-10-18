@@ -8,7 +8,6 @@ from sqlalchemy.orm import selectinload
 from app.Objects.UserModel import User
 from app.Objects.UserRoleModel import UserRole
 from app.Services.Hub.AuthService import AuthService
-from app.Services.Hub.AuthService.utils import get_hashed_password
 from app.Services.Hub.UserService.contracts import (
     UsersListResponse,
     UserDetailsResponse,
@@ -25,14 +24,14 @@ class UserService:
 
     async def CreateUser(self, email: str | EmailStr, password: str, first_name: str) -> CreateUserResponse:
         result = await AuthService(self.db).RegisterUser(email, password, first_name)
-        return CreateUserResponse(ok=True, user_id=result.user_id)
+        return CreateUserResponse(user_id=result.user_id)
 
     async def GetUsersList(self) -> UsersListResponse:
         stmt = await self.db.execute(
             select(User).options(selectinload(User.role))
         )
         result = stmt.scalars().all()
-        return UsersListResponse(ok=True, total=len(result), users=result)
+        return UsersListResponse(total=len(result), list=result)
 
     async def GetUserDetails(self, user_id: uuid.UUID, actor: User) -> UserDetailsResponse:
         user = await self.db.get(User, user_id)
@@ -49,6 +48,9 @@ class UserService:
                 actions.append("deactivate_user")
             else:
                 actions.append("activate_user")
+        if actor_role.order <= 1:
+            actions.append("give_badge")
+            actions.append("remove_badge")
 
         # 🧑‍💼 Отримуємо керівників
         supervisors = []
@@ -67,7 +69,6 @@ class UserService:
         subordinates = q2.scalars().all()
 
         return UserDetailsResponse(
-            ok=True,
             user=user,
             actions=actions,
             supervisors=supervisors,
@@ -84,7 +85,7 @@ class UserService:
         user.is_active = False
         await self.db.commit()
 
-        return DeactivateUserResponse(ok=True, user_id=user.id)
+        return DeactivateUserResponse(user_id=user.id)
 
     async def ActivateUser(self, user_id: uuid.UUID) -> ActivateUserResponse:
         result = await self.db.execute(select(User).where(User.id == user_id))
@@ -96,4 +97,4 @@ class UserService:
         user.is_active = True
         await self.db.commit()
 
-        return ActivateUserResponse(ok=True, user_id=user.id)
+        return ActivateUserResponse(user_id=user.id)

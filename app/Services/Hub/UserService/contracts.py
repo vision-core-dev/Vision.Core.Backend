@@ -7,9 +7,8 @@ from app.Objects.UserModel import SmallUserBase, UserBase
 
 
 class UsersListResponse(BaseModel):
-    ok: bool
     total: int
-    users: List[SmallUserBase]
+    list: List[SmallUserBase]
 
     class Config:
         from_attributes = True
@@ -22,12 +21,10 @@ class CreateUserRequest(BaseModel):
 
 
 class CreateUserResponse(BaseModel):
-    ok: bool
     user_id: UUID
 
 
 class UserDetailsResponse(BaseModel):
-    ok: bool
     user: UserBase
     actions: list[str] = []
     supervisors: list[SmallUserBase] = []
@@ -38,17 +35,14 @@ class UserDetailsResponse(BaseModel):
 
 
 class ActivateUserResponse(BaseModel):
-    ok: bool
     user_id: UUID
 
 
 class DeactivateUserResponse(BaseModel):
-    ok: bool
     user_id: UUID
 
 
 class DetailsUserResponse(BaseModel):
-    ok: bool
     user: UserBase
     actions: Optional[List[str]] = None
 

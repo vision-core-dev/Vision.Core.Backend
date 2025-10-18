@@ -10,3 +10,6 @@ hub_router.include_router(users_router)
 
 from .Events import events_router
 hub_router.include_router(events_router)
+
+from .UserMe import user_me_router
+hub_router.include_router(user_me_router)

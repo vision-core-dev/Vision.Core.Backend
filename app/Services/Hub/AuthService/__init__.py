@@ -45,7 +45,7 @@ class AuthService:
             await self.db.commit()
             await self.db.refresh(user)
 
-        return LoginResponse(ok=True, token=str(user.temp_token))
+        return LoginResponse(token=str(user.temp_token))
 
     async def CheckMe(self, user: User) -> CheckMeResponse:
         if not user:
@@ -65,7 +65,6 @@ class AuthService:
         await self.db.refresh(user)
 
         return CheckMeResponse(
-            ok=True,
             user=MeUserBase.from_orm(user),
             role=MyUserRoleBase.from_orm(role),
         )
@@ -102,4 +101,4 @@ class AuthService:
         await self.db.commit()
         await self.db.refresh(new_user)
 
-        return RegisterUserResponse(ok=True, user_id=new_user.id, email=email, password=password)
+        return RegisterUserResponse(user_id=new_user.id, email=email, password=password)

@@ -14,6 +14,7 @@ class CreateEventRequest(BaseModel):
     time_to: time
     location: str | None = None
     location_url: str | None = None
+    invitees: list[uuid.UUID] = []
 
 class CreateEventResponse(BaseModel):
     event_id: str

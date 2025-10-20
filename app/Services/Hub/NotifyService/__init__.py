@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,3 +60,18 @@ class NotifyService:
         await self.db.execute(stmt)
         await self.db.commit()
         return {"status": "ok", "message": "Усі сповіщення позначені як переглянуті"}
+
+    async def CreateNotification(self, user_id: uuid.UUID, title: str, message: str, link: str = None):
+        """
+        Створити нове сповіщення для користувача
+        """
+        new_notif = UserNotif(
+            user_id=user_id,
+            title=title,
+            message=message,
+            link=link,
+        )
+        self.db.add(new_notif)
+        # await self.db.commit()
+        # await self.db.refresh(new_notif)
+        # return MyNotifBase.model_validate(new_notif)

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 
 from fastapi import HTTPException
@@ -8,6 +9,9 @@ from app.Objects.UserModel import User
 from app.Services.Hub.EventService.contracts import CreateEventRequest, CreateEventResponse, ListEventsResponse, \
     PublicEventDetailsResponse, ModerateEventDetailsResponse, ChangeEventStatusResponse
 import uuid
+
+from app.Services.Hub.NotifyService import NotifyService
+
 
 class EventService:
     def __init__(self, db: AsyncSession):
@@ -33,6 +37,27 @@ class EventService:
         self.db.add(new_event)
         await self.db.commit()
         await self.db.refresh(new_event)
+
+        date_str = new_event.date.strftime("%d.%m.%Y")
+        time_from_str = new_event.time_from.strftime("%H:%M")
+        time_to_str = new_event.time_to.strftime("%H:%M")
+
+        for user_id in data.invitees:
+            new_invite = EventInvite(
+                event_id=new_event.id,
+                user_id=user_id,
+                status="pending"
+            )
+            self.db.add(new_invite)
+
+            await NotifyService(self.db).CreateNotification(
+                user_id,
+                "Запрошення на подію",
+                f"Вас запрошено на подію <b>{new_event.name}</b> 🗓️ {date_str} 🕐 {time_from_str}–{time_to_str} у {new_event.location}.",
+                link=f"/calendar/e/{new_event.id}"
+            )
+
+        await self.db.commit()
 
         return CreateEventResponse(event_id=str(new_event.id))
 

@@ -1,15 +1,15 @@
-import os
-
-from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request
 from fastapi.security import HTTPBearer
+from sqlalchemy import text
 from starlette.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware
 
 from app.API import api_router
 from app.Infrastructure.Database import Base, engine
+from app.Infrastructure.Redis import connect_redis, disconnect_redis
+from app.Services.CurrencyService import CurrencyService
 
 load_dotenv()
 
@@ -17,17 +17,18 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     print("🚀 Starting application...")
     try:
-        # await redis_client.connect()
+        app.state.redis = await connect_redis()
 
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
+        # await CurrencyService().RefreshExchangeRate(redis=app.state.redis, currency_code="UAH")
         yield
     except Exception as e:
         print(f"❌ Failed to start application: {e}")
         raise
     finally:
-        # await redis_client.disconnect()
+        await disconnect_redis(app.state.redis)
         print("👋 Application stopped")
 
 app = FastAPI(

@@ -1,14 +1,21 @@
+import enum
 import uuid
 from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel
-from sqlalchemy import Column, String, DateTime, UUID, func, ARRAY, ForeignKey, Boolean, sql
+from sqlalchemy import Column, String, DateTime, UUID, func, ARRAY, ForeignKey, Boolean, sql, Numeric
+from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.orm import relationship, backref
 
 from app.Infrastructure.Database import Base
 from app.Objects.UserRoleModel import UserRoleBase, SmallUserRoleBase
 
+
+class Currency(enum.Enum):
+    UAH = "UAH"
+    USD = "USD"
+    EUR = "EUR"
 
 class User(Base):
     __tablename__ = "Users"
@@ -18,6 +25,9 @@ class User(Base):
     # Auth info
     email = Column(String(100), unique=True, nullable=True)
     hashed_password = Column(String(255), nullable=True)
+
+    balance = Column(Numeric(10, 2), nullable=False, default=0.00)
+    currency = Column(ENUM(Currency), nullable=False, server_default="UAH")
 
     is_active = Column(Boolean, nullable=False, server_default=sql.expression.true())
 

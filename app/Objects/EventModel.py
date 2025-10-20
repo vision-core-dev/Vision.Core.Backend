@@ -31,6 +31,7 @@ class Event(Base):
     time_to = Column(Time, nullable=False)
 
     location = Column(String(255), nullable=True)
+    location_url = Column(TEXT, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -46,6 +47,7 @@ class EventInvite(Base):
 
     # 📝 Причина відмови або неявки
     reason = Column(TEXT, nullable=True)
+    responded_at = Column(DateTime(timezone=True), nullable=True)
 
     # 📆 Фактичний час коли користувач прибув (якщо прийшов)
     attended_at = Column(DateTime(timezone=True), nullable=True)
@@ -61,6 +63,20 @@ class EventBase(BaseModel):
     time_from: time
     time_to: time
     location: str | None
+    location_url: str | None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class EventInviteBase(BaseModel):
+    id: uuid.UUID
+    event_id: uuid.UUID
+    user_id: uuid.UUID
+    status: str
+    reason: str | None
+    responded_at: datetime | None
+    attended_at: datetime | None
     created_at: datetime
 
     class Config:

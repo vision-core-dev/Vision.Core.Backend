@@ -1,7 +1,12 @@
+from datetime import datetime
+
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.Objects.EventModel import Event
-from app.Services.Hub.EventService.contracts import CreateEventRequest, CreateEventResponse, ListEventsResponse
+from app.Objects.EventModel import Event, EventInvite, EventInviteStatus
+from app.Objects.UserModel import User
+from app.Services.Hub.EventService.contracts import CreateEventRequest, CreateEventResponse, ListEventsResponse, \
+    PublicEventDetailsResponse, ModerateEventDetailsResponse, ChangeEventStatusResponse
 import uuid
 
 class EventService:
@@ -31,3 +36,98 @@ class EventService:
 
         return CreateEventResponse(event_id=str(new_event.id))
 
+    async def GetEventPublicDetails(self, event_id: uuid.UUID, user: User) -> PublicEventDetailsResponse:
+        try:
+            event_uuid = uuid.UUID(str(event_id))
+            user_uuid = uuid.UUID(str(user.id))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="invalid_uuid")
+
+        event_result = await self.db.execute(
+            select(Event).where(Event.id == event_uuid)
+        )
+        event = event_result.scalar_one_or_none()
+        if not event:
+            raise HTTPException(status_code=404, detail="event_not_found")
+
+        invite_result = await self.db.execute(
+            select(EventInvite).where(
+                EventInvite.event_id == event_uuid,
+                EventInvite.user_id == user_uuid
+            )
+        )
+        invite = invite_result.scalar_one_or_none()
+
+        if not invite:
+            raise HTTPException(status_code=403, detail="invite_not_found")
+
+        actions = []
+        if invite.status == "pending":
+            actions = ["accept", "decline"]
+        elif invite.status == "accepted":
+            actions = ["decline"]
+        elif invite.status == "declined":
+            actions = ["accept"]
+
+        if invite.status == "accepted":
+            actions.append("join")
+
+        return PublicEventDetailsResponse(
+            event=event,
+            invite=invite,
+            actions=actions
+        )
+
+    async def GetEventModerateDetails(self, event_id: str, user: User) -> ModerateEventDetailsResponse:
+        event_result = await self.db.execute(
+            select(Event).where(Event.id == uuid.UUID(event_id))
+        )
+        event = event_result.scalar_one_or_none()
+        if not event:
+            raise HTTPException(status_code=404, detail="event_not_found")
+
+        invitees_result = await self.db.execute(
+            select(EventInvite).where(EventInvite.event_id == uuid.UUID(event_id))
+        )
+        invitees = invitees_result.scalars().all()
+
+        return ModerateEventDetailsResponse(
+            event=event,
+            invitees=invitees,
+            actions=["edit", "delete", "notify"]
+        )
+
+    async def ChangeEventInviteStatus(self, event_id: uuid.UUID, user: User, new_status: EventInviteStatus) -> ChangeEventStatusResponse:
+        try:
+            event_uuid = uuid.UUID(str(event_id))
+            user_uuid = uuid.UUID(str(user.id))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="invalid_uuid")
+
+        event_result = await self.db.execute(
+            select(Event).where(Event.id == event_uuid)
+        )
+        event = event_result.scalar_one_or_none()
+        if not event:
+            raise HTTPException(status_code=404, detail="event_not_found")
+
+        invite_result = await self.db.execute(
+            select(EventInvite).where(
+                EventInvite.event_id == event_uuid,
+                EventInvite.user_id == user_uuid
+            )
+        )
+        invite = invite_result.scalar_one_or_none()
+        if not invite:
+            raise HTTPException(status_code=403, detail="invite_not_found")
+
+        invite.status = new_status.value
+        invite.responded_at = datetime.utcnow()
+
+        await self.db.commit()
+        await self.db.refresh(invite)
+
+        return ChangeEventStatusResponse(
+            event_id=event.id,
+            status=new_status.value
+        )

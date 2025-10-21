@@ -19,6 +19,4 @@ async def get_my_lower_roles(user: User = Depends(getuser), db: AsyncSession = D
     )
     result = stmt.scalars().all()
 
-    print(actor_role.order, result)
-
     return result

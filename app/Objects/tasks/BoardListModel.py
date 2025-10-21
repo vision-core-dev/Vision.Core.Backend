@@ -3,7 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import Column, UUID, String, Integer, func, DateTime, ForeignKey
 
-from app.Infrastructure.Database import Base
+from app.Infrastructure.Database import Base, PydModel
 
 
 class BoardList(Base):
@@ -17,3 +17,10 @@ class BoardList(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=datetime.now())
+
+class BoardListBase(PydModel):
+    id: uuid.UUID
+    board_id: uuid.UUID
+    name: str
+    order: int | None
+    color: str | None

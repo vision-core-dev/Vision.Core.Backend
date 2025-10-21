@@ -2,11 +2,11 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, UUID, ForeignKey, DateTime, Boolean, Numeric, String, Text, func, Enum, BigInteger
-from sqlalchemy.dialects.mysql import ENUM
+from sqlalchemy import Column, UUID, ForeignKey, DateTime, Boolean, Numeric, String, Text, func, BigInteger
+from sqlalchemy.dialects.postgresql import ARRAY, ENUM
 from sqlalchemy.orm import relationship
 
-from app.Infrastructure.Database import Base
+from app.Infrastructure.Database import Base, PydModel
 
 
 class TaskStatus(enum.Enum):
@@ -26,21 +26,22 @@ class Task(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     parent_task_id = Column(UUID(as_uuid=True), ForeignKey("Tasks.id"), nullable=True)
 
-    board_id = Column(UUID(as_uuid=True), ForeignKey("Boards.id", ondelete="CASCADE"))
-    list_id = Column(UUID(as_uuid=True), ForeignKey("BoardLists.id", ondelete="SET NULL"))
-    order = Column(BigInteger, nullable=False)
+    board_id = Column(UUID(as_uuid=True), ForeignKey("Boards.id", ondelete="SET NULL"), nullable=True)
+    list_id = Column(UUID(as_uuid=True), ForeignKey("BoardLists.id", ondelete="SET NULL"), nullable=True)
+    order = Column(BigInteger, nullable=True)
 
-    title = Column(String(255), nullable=False)
+    name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
+    tags = Column(ARRAY(UUID(as_uuid=True)), nullable=True)
 
     created_by_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"))
-    assigned_to_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"), nullable=True)
 
     value_uah = Column(Numeric(10, 2), default=0.00)
     penalty_uah = Column(Numeric(10, 2), default=0.00)
     is_accrued = Column(Boolean, default=False) # чи нараховано
 
-    deadline = Column(DateTime, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    deadline_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
 
     status = Column(ENUM(TaskStatus), default=TaskStatus.backlog)
@@ -72,4 +73,11 @@ class TaskAssignee(Base):
 
 # for assignee in task.assignees:
 #     payout = task.value_uah * (assignee.share or 1 / len(task.assignees))
-#     # нараховуєш кожному
+
+class TaskPreview(PydModel):
+    id: uuid.UUID
+    title: str
+    status: TaskStatus
+    priority: TaskPriority
+    assigned_to_id: uuid.UUID | None
+    deadline_at: datetime | None

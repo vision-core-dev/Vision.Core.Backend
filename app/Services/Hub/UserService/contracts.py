@@ -4,12 +4,12 @@ from uuid import UUID
 from pydantic import BaseModel, EmailStr
 
 from app.Objects.BadgeModel import UserBadgeBase
-from app.Objects.UserModel import SmallUserBase, UserBase
+from app.Objects.UserModel import UserBase, UserPreview
 
 
 class UsersListResponse(BaseModel):
     total: int
-    list: List[SmallUserBase]
+    list: List[UserPreview]
 
     class Config:
         from_attributes = True
@@ -28,8 +28,8 @@ class CreateUserResponse(BaseModel):
 class UserDetailsResponse(BaseModel):
     user: UserBase
     actions: list[str] = []
-    supervisors: list[SmallUserBase] = []
-    subordinates: list[SmallUserBase] = []
+    supervisors: list[UserPreview] = []
+    subordinates: list[UserPreview] = []
     badges: list[UserBadgeBase] = []
 
     class Config:

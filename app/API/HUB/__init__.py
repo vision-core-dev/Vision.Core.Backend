@@ -16,3 +16,6 @@ hub_router.include_router(user_me_router)
 
 from .UserRoles import user_roles_router
 hub_router.include_router(user_roles_router)
+
+from .Boards import boards_router
+hub_router.include_router(boards_router)

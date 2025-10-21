@@ -4,7 +4,7 @@ from datetime import datetime
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.Objects.EventModel import Event, EventInvite, EventInviteStatus
+from app.Objects.EventModel import Event, EventInvite, EventInviteStatus, EventPreview
 from app.Objects.UserModel import User
 from app.Services.Hub.EventService.contracts import CreateEventRequest, CreateEventResponse, ListEventsResponse, \
     PublicEventDetailsResponse, ModerateEventDetailsResponse, ChangeEventStatusResponse
@@ -23,6 +23,21 @@ class EventService:
         )
         events = result.scalars().all()
         return ListEventsResponse(total=len(events), list=events)
+
+    async def GetUserEventsList(self, user: User) -> list[EventPreview]:
+        result = await self.db.execute(
+            select(Event).join(EventInvite).where(EventInvite.user_id == user.id)
+        )
+        events = result.scalars().all()
+        return [
+            EventPreview(
+                id=event.id,
+                name=event.name,
+                date=event.date,
+                time_from=event.time_from,
+                time_to=event.time_to,
+            ) for event in events
+        ]
 
     async def CreateEvent(self, data: CreateEventRequest) -> CreateEventResponse:
         new_event = Event(

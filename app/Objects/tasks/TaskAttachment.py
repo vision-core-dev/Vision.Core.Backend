@@ -1,7 +1,7 @@
 import enum
 
 from sqlalchemy import Column, DateTime, func, UUID, ForeignKey, Text, String
-from sqlalchemy.dialects.mysql import ENUM
+from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.orm import relationship
 
 from app.Infrastructure.Database import Base
@@ -12,7 +12,7 @@ class AttachmentType(enum.Enum):
     link = "link"
 
 class TaskAttachment(Base):
-    __tablename__ = "task_attachments"
+    __tablename__ = "TaskAttachments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
 

@@ -4,12 +4,11 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel
-from sqlalchemy import Column, String, DateTime, UUID, func, ARRAY, ForeignKey, Boolean, sql, Numeric
+from sqlalchemy import Column, String, DateTime, UUID, func, ARRAY, ForeignKey, Boolean, sql, Numeric, Integer, TEXT
 from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.orm import relationship, backref
 
-from app.Infrastructure.Database import Base
-from app.Objects.UserRoleModel import UserRoleBase, SmallUserRoleBase
+from app.Infrastructure.Database import Base, PydModel
 
 
 class Currency(enum.Enum):
@@ -51,21 +50,58 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), default=datetime.now(), onupdate=datetime.now())
 
+    boards = relationship(
+        "Board",
+        secondary="BoardMembers",
+        back_populates="members"
+    )
+
+
+class UserRole(Base):
+    __tablename__ = "UserRoles"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    key = Column(String(50), unique=True, nullable=False)
+    name = Column(String(50), unique=True, nullable=False)
+
+    menu = Column(ARRAY(TEXT), nullable=False, default=[])
+    order = Column(Integer, nullable=False, default=0)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), default=datetime.now(), onupdate=datetime.now())
+
+class UserRolePreview(PydModel):
+    id: uuid.UUID
+    key: str
+    name: str
+
+class UserRoleBase(PydModel):
+    id: uuid.UUID
+    key: str
+    name: str
+    menu: list[str]
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class MyUserRoleBase(PydModel):
+    id: uuid.UUID
+    key: str
+    name: str
+    menu: list[str]
 
 
 
-class SmallUserBase(BaseModel):
+
+class UserPreview(PydModel):
     id: uuid.UUID
     email: str | None
     first_name: str | None
     last_name: str | None
     avatar_url: str | None
-    role: Optional[SmallUserRoleBase] = None
+    role: Optional[UserRolePreview] = None
     created_at: datetime
-    class Config:
-        from_attributes = True
 
-class UserBase(BaseModel):
+class UserBase(PydModel):
     id: uuid.UUID
     email: str | None
     first_name: str | None
@@ -77,15 +113,11 @@ class UserBase(BaseModel):
     temp_token: uuid.UUID | None
     last_login: datetime | None
     created_at: datetime
-    updated_at: datetime
-    class Config:
-        from_attributes = True
+    updated_at: datetime | None = None
 
-class MeUserBase(UserBase):
+class MeUserBase(PydModel):
     id: uuid.UUID
     email: Optional[str]
     first_name: Optional[str]
     last_name: Optional[str]
     avatar_url: Optional[str]
-    class Config:
-        from_attributes = True

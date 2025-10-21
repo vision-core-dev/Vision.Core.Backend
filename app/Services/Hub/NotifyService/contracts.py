@@ -1,11 +1,11 @@
 from pydantic import BaseModel
 
-from app.Objects.NotificationModel import MyNotifBase
+from app.Objects.NotifyModel import MyNotifyBase
 
 
 class NotifiesListResponse(BaseModel):
     total: int
-    list: list[MyNotifBase]
+    list: list[MyNotifyBase]
 
     class Config:
         from_attributes = True

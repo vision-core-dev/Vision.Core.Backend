@@ -6,8 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
 
 from app.Objects.BadgeModel import UserBadge, Badge, UserBadgeBase
-from app.Objects.UserModel import User
-from app.Objects.UserRoleModel import UserRole
+from app.Objects.UserModel import User, UserRole
 from app.Services.Hub.AuthService import AuthService
 from app.Services.Hub.UserService.contracts import (
     UsersListResponse,

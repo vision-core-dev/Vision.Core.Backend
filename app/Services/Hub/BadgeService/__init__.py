@@ -4,9 +4,7 @@ from sqlalchemy.orm import joinedload
 from datetime import datetime
 import uuid
 
-from app.Objects.BadgeModel import Badge, UserBadge
-from app.Objects.UserModel import User
-from app.Schemas.BadgeSchema import UserBadgeBase
+from app.Objects.BadgeModel import Badge, UserBadge, UserBadgeBase
 
 
 class BadgeService:

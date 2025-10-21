@@ -1,6 +1,7 @@
 import os
 
 from dotenv import load_dotenv
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 
@@ -25,3 +26,9 @@ async def getdb() -> AsyncSession:
         yield session
 
 Base = declarative_base()
+
+class PydModel(BaseModel):
+    model_config = {
+        "from_attributes": True,
+        "arbitrary_types_allowed": True
+    }

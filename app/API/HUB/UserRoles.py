@@ -3,8 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.Infrastructure.Database import getdb
-from app.Objects.UserModel import User
-from app.Objects.UserRoleModel import UserRoleBase, UserRole
+from app.Objects.UserModel import User, UserRoleBase, UserRole
 from app.Services.Hub.AuthService.depends import getuser
 
 user_roles_router = APIRouter(prefix="/UserRoles", tags=["Hub > UserRoles"])

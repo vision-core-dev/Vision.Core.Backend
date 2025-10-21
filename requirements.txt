@@ -19,3 +19,4 @@ bcrypt
 itsdangerous
 keyring
 pydantic[email]
+psycopg2

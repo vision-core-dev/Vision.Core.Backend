@@ -10,7 +10,7 @@ class Log(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=func.gen_random_uuid())
 
-    actor_id = Column(UUID(as_uuid=True), ForeignKey(), nullable=True)
+    actor_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"), nullable=True)
 
     entity_type = Column(String(100), nullable=False)
     entity_id = Column(UUID(as_uuid=True), nullable=False)

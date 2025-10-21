@@ -5,8 +5,7 @@ from pydantic import EmailStr
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.Objects.UserModel import User, MeUserBase
-from app.Objects.UserRoleModel import UserRole, MyUserRoleBase
+from app.Objects.UserModel import User, MeUserBase, UserRole, MyUserRoleBase
 from app.Services.Hub.AuthService.contracts import LoginResponse, CheckMeResponse, RegisterUserResponse
 from app.Services.Hub.AuthService.utils import get_hashed_password, check_password
 

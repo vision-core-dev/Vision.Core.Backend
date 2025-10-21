@@ -1,13 +1,12 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
 from sqlalchemy import Column, func, UUID, String, ForeignKey, TEXT, DateTime, Boolean
 
-from app.Infrastructure.Database import Base
+from app.Infrastructure.Database import Base, PydModel
 
 
-class UserNotif(Base):
+class UserNotify(Base):
     __tablename__ = "UserNotifs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
@@ -21,13 +20,10 @@ class UserNotif(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
-class MyNotifBase(BaseModel):
+class MyNotifyBase(PydModel):
     id: uuid.UUID
     title: str
     message: str
     link: str | None
     is_read: bool
     created_at: datetime | None
-
-    class Config:
-        from_attributes = True

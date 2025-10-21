@@ -1,11 +1,10 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
 from sqlalchemy import Column, DateTime, func, UUID, String, TEXT, ForeignKey
 from sqlalchemy.orm import relationship
 
-from app.Infrastructure.Database import Base
+from app.Infrastructure.Database import Base, PydModel
 
 
 class Badge(Base):
@@ -31,7 +30,7 @@ class UserBadge(Base):
 
     awarded_at = Column(DateTime(timezone=True), server_default=func.now())
 
-class UserBadgeBase(BaseModel):
+class UserBadgeBase(PydModel):
     id: uuid.UUID       
     name: str
     description: str | None

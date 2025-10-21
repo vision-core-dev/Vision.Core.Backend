@@ -2,10 +2,9 @@ import enum
 import uuid
 from datetime import datetime, time
 
-from pydantic import BaseModel
 from sqlalchemy import Column, String, DateTime, UUID, TEXT, func, Time
 
-from app.Infrastructure.Database import Base
+from app.Infrastructure.Database import Base, PydModel
 
 
 class EventInviteStatus(enum.Enum):
@@ -55,7 +54,14 @@ class EventInvite(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-class EventBase(BaseModel):
+class EventPreview(PydModel):
+    id: uuid.UUID
+    name: str
+    date: datetime
+    time_from: time
+    time_to: time
+
+class EventBase(PydModel):
     id: uuid.UUID
     name: str
     description: str | None
@@ -66,10 +72,7 @@ class EventBase(BaseModel):
     location_url: str | None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
-class EventInviteBase(BaseModel):
+class EventInviteBase(PydModel):
     id: uuid.UUID
     event_id: uuid.UUID
     user_id: uuid.UUID
@@ -78,6 +81,3 @@ class EventInviteBase(BaseModel):
     responded_at: datetime | None
     attended_at: datetime | None
     created_at: datetime
-
-    class Config:
-        from_attributes = True

@@ -5,8 +5,7 @@ from typing import Dict, Optional, List
 
 from pydantic import BaseModel
 
-from app.Objects.UserModel import MeUserBase
-from app.Objects.UserRoleModel import MyUserRoleBase
+from app.Objects.UserModel import MeUserBase, MyUserRoleBase
 
 
 class LoginRequest(BaseModel):

@@ -32,7 +32,11 @@ class Task(Base):
 
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    banner_attachment_id = Column(UUID(as_uuid=True), ForeignKey("TaskAttachments.id"), nullable=True)
+    banner_attachment_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("TaskAttachments.id", use_alter=True, name="fk_task_banner_attachment_id"),
+        nullable=True
+    )
     tags = Column(ARRAY(UUID(as_uuid=True)), nullable=True)
 
     created_by_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"))

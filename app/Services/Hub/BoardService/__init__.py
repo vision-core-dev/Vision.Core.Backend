@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from fastapi import HTTPException, UploadFile
 from sqlalchemy import select
@@ -8,7 +9,7 @@ from app.Infrastructure.Storage import _upload_to_bunny, _delete_from_bunny
 from app.Objects.UserModel import User, UserPreview
 from app.Objects.tasks.BoardListModel import BoardList
 from app.Objects.tasks.BoardModel import Board
-from app.Objects.tasks.TaskModel import Task, TaskPreview
+from app.Objects.tasks.TaskModel import Task, TaskPreview, TaskAssignee
 from app.Objects.tasks.TaskTags import TaskTag
 from app.Services.Hub.BoardService.contracts import CreateBoardResponse, BoardsListResponse, BoardDetailsResponse
 
@@ -200,3 +201,68 @@ class BoardService:
         await self.db.refresh(board)
 
         return banner_url
+
+    async def CreateTask(
+        self,
+        board_id: uuid.UUID,
+        list_id: uuid.UUID,
+        name: str,
+        description: str | None,
+        assignee_ids: list[uuid.UUID] | None,
+        priority: str | None,
+        deadline_at: datetime | None,
+        value_uah: float | None,
+        created_by: User
+    ):
+        # ✅ Перевірка дошки
+        board = await self.db.get(Board, board_id)
+        if not board:
+            raise HTTPException(status_code=404, detail="board_not_found")
+
+        # ✅ Перевірка списку
+        lst = await self.db.get(BoardList, list_id)
+        if not lst or lst.board_id != board_id:
+            raise HTTPException(status_code=404, detail="list_not_found")
+
+        # ✅ Визначення порядку (останній +1)
+        order_query = await self.db.execute(
+            select(Task.order)
+            .where(Task.list_id == list_id)
+            .order_by(Task.order.desc())
+            .limit(1)
+        )
+        last_order = order_query.scalar()
+        new_order = (last_order or 0) + 1
+
+        # ✅ Створюємо задачу
+        task = Task(
+            board_id=board_id,
+            list_id=list_id,
+            name=name,
+            description=description,
+            created_by_id=created_by.id,
+            priority=priority or "low",
+            deadline_at=deadline_at,
+            order=new_order,
+            value_uah=value_uah or 0.0
+        )
+
+        self.db.add(task)
+        await self.db.flush()  # потрібно, щоб отримати ID
+
+        # ✅ Призначаємо виконавців
+        if assignee_ids:
+            for uid in assignee_ids:
+                self.db.add(TaskAssignee(task_id=task.id, user_id=uid))
+
+        await self.db.commit()
+        await self.db.refresh(task)
+
+        return {
+            "ok": True,
+            "id": task.id,
+            "name": task.name,
+            "list_id": task.list_id,
+            "priority": task.priority,
+            "deadline_at": task.deadline_at,
+        }

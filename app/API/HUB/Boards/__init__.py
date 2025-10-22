@@ -20,7 +20,7 @@ async def create_board(data: CreateBoardRequest, user: User = Depends(getuser), 
     return await BoardService(db).CreateBoard(data.name, data.description, user)
 
 @boards_router.get("/{board_id}/GetDetails", response_model=BoardDetailsResponse)
-async def get_board_details(board_id: str, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+async def get_board_details(board_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
     return await BoardService(db).GetBoardDetails(board_id, user)
 
 

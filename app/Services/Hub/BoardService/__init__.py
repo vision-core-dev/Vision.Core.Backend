@@ -2,6 +2,7 @@ import uuid
 
 from fastapi import HTTPException, UploadFile
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.Infrastructure.Storage import _upload_to_bunny, _delete_from_bunny
 from app.Objects.UserModel import User, UserPreview
@@ -70,6 +71,7 @@ class BoardService:
         tasks_result = await self.db.execute(
             select(Task)
             .where(Task.board_id == board_id)
+            .options(selectinload(Task.assignees))
             .order_by(Task.order)
         )
         tasks = tasks_result.scalars().unique().all()

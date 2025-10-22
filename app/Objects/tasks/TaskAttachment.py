@@ -24,3 +24,18 @@ class TaskAttachment(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     task = relationship("Task", backref="attachments")
+
+
+class TaskComment(Base):
+    __tablename__ = "TaskComments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+
+    task_id = Column(UUID(as_uuid=True), ForeignKey("Tasks.id", ondelete="CASCADE"))
+    user_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"))
+
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    task = relationship("Task", backref="comments")
+    user = relationship("User")

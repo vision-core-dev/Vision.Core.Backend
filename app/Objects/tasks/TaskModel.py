@@ -79,7 +79,7 @@ class TaskPreview(PydModel):
     id: uuid.UUID
     name: str
     banner_url: str | None = None
-    status: TaskStatus
+    status: TaskStatus | None = None
     list_id: uuid.UUID | None = None
     priority: TaskPriority | None = None
     deadline_at: datetime | None = None

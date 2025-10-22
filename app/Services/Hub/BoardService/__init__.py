@@ -75,7 +75,7 @@ class BoardService:
         tasks = tasks_result.scalars().unique().all()
 
         # 🟩 5. Отримуємо всі теги задач
-        tags_result = await self.db.execute(select(TaskTag))
+        tags_result = await self.db.execute(select(TaskTag).where(TaskTag.board_id == board_id))
         tags = tags_result.scalars().all()
 
         # 🟩 6. Формуємо відповідь

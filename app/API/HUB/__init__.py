@@ -22,3 +22,6 @@ hub_router.include_router(boards_router)
 
 from .Knowledge import knowledge_router
 hub_router.include_router(knowledge_router)
+
+from .Tasks import tasks_router
+hub_router.include_router(tasks_router)

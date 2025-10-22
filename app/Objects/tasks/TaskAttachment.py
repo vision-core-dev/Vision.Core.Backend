@@ -17,13 +17,12 @@ class TaskAttachment(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
 
     task_id = Column(UUID(as_uuid=True), ForeignKey("Tasks.id", ondelete="CASCADE"))
-
     type = Column(ENUM(AttachmentType), nullable=False)
     url = Column(Text, nullable=False)
     name = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    task = relationship("Task", backref="attachments")
+    task = relationship("Task", back_populates="attachments", foreign_keys=[task_id])
 
 
 class TaskComment(Base):

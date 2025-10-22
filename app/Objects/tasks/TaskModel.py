@@ -59,6 +59,9 @@ class Task(Base):
     list = relationship("BoardList", backref="Tasks")
     created_by = relationship("User", foreign_keys=[created_by_id])
     assignees = relationship("TaskAssignee", back_populates="task", cascade="all, delete-orphan")
+    attachments = relationship("TaskAttachment", back_populates="task", cascade="all, delete-orphan", foreign_keys="[TaskAttachment.task_id]")
+    banner_attachment = relationship("TaskAttachment", foreign_keys=[banner_attachment_id])
+
 
 
 class TaskAssignee(Base):

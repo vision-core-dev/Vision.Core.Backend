@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Body
+from fastapi import APIRouter, Depends, Body, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.Infrastructure.Database import getdb
@@ -65,3 +65,27 @@ async def remove_list(
     db: AsyncSession = Depends(getdb)
 ):
     return await BoardService(db).RemoveList(board_id, list_id)
+
+
+@boards_router.post("/{board_id}/UploadBanner")
+async def upload_banner(
+    board_id: uuid.UUID,
+    file: UploadFile = File(...),
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    # тут передаємо файл до сервісу
+    svc = BoardService(db)
+    url = await svc.UploadBannerFile(board_id, file, user)
+    return {"ok": True, "banner_url": url}
+@boards_router.post("/{board_id}/SetBanner")
+async def set_board_banner(
+    board_id: uuid.UUID,
+    data: dict = Body(...),
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    """
+    Змінює банер (cover) дошки — зберігає URL або шлях до файлу.
+    """
+    return await BoardService(db).SetBoardBanner(board_id, data.get("banner_url"), user)

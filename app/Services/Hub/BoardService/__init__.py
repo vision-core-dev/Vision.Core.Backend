@@ -1,8 +1,9 @@
 import uuid
 
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 from sqlalchemy import select
 
+from app.Infrastructure.Storage import _upload_to_bunny
 from app.Objects.UserModel import User, UserPreview
 from app.Objects.tasks.BoardListModel import BoardList
 from app.Objects.tasks.BoardModel import Board
@@ -159,3 +160,40 @@ class BoardService:
         await self.db.delete(lst)
         await self.db.commit()
         return {"ok": True}
+
+    async def SetBoardBanner(self, board_id: uuid.UUID, banner_url: str, user: User):
+        board = await self.db.get(Board, board_id)
+        if not board:
+            raise HTTPException(status_code=404, detail="board_not_found")
+
+        # Перевіряємо права (опціонально)
+        if board.created_by_id != user.id:
+            raise HTTPException(status_code=403, detail="no_permission")
+
+        # Оновлюємо банер
+        board.banner_url = banner_url
+        await self.db.commit()
+        await self.db.refresh(board)
+
+        return {"ok": True, "banner_url": board.banner_url}
+
+    async def UploadBannerFile(self, board_id: uuid.UUID, file: UploadFile, user: User) -> str:
+        board = await self.db.get(Board, board_id)
+        if not board:
+            raise HTTPException(status_code=404, detail="board_not_found")
+        if board.created_by_id != user.id:
+            raise HTTPException(status_code=403, detail="no_permission")
+
+        # читаємо файл із UploadFile
+        contents = await file.read()
+        filename = f"boards/{board_id}/{uuid.uuid4()}_{file.filename}"
+
+        # викликаємо Bunny upload
+        banner_url = await _upload_to_bunny(filename, contents, file.content_type)
+
+        # оновлюємо дошку
+        board.banner_url = banner_url
+        await self.db.commit()
+        await self.db.refresh(board)
+
+        return banner_url

@@ -20,3 +20,5 @@ itsdangerous
 keyring
 pydantic[email]
 psycopg2
+bunnycdnpython
+python-multipart

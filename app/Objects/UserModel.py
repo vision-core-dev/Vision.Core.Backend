@@ -55,6 +55,8 @@ class User(Base):
         secondary="BoardMembers",
         back_populates="members"
     )
+    assigned_tasks = relationship("TaskAssignee", back_populates="user", cascade="all, delete-orphan")
+
 
 
 class UserRole(Base):
@@ -98,12 +100,13 @@ class UserShort(BaseModel):
 
 class UserPreview(PydModel):
     id: uuid.UUID
-    email: str | None
+    email: str | None = None
     first_name: str | None
     last_name: str | None
     avatar_url: str | None
     role: Optional[UserRolePreview] = None
-    created_at: datetime
+    role_name: str | None = None
+    created_at: datetime | None = None
 
 class UserBase(PydModel):
     id: uuid.UUID

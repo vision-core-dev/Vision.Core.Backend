@@ -2,7 +2,11 @@ import uuid
 
 from pydantic import BaseModel
 
-from app.Objects.tasks.BoardModel import BoardBase
+from app.Objects.UserModel import UserPreview
+from app.Objects.tasks.BoardListModel import BoardListBase
+from app.Objects.tasks.BoardModel import BoardBase, BoardPreview
+from app.Objects.tasks.TaskModel import TaskPreview
+from app.Objects.tasks.TaskTags import TaskTagBase
 
 
 class CreateBoardRequest(BaseModel):
@@ -14,11 +18,11 @@ class CreateBoardResponse(BaseModel):
 
 class BoardsListResponse(BaseModel):
     total: int
-    boards: list[BoardBase]
+    list: list[BoardPreview]
 
 class BoardDetailsResponse(BaseModel):
     board: BoardBase
-    # members: list[UserPreview]
-    # lists: list[BoardListBase]
-    # tasks: list[TaskPreview]
-    # tags: list[TaskTagBase]
+    members: list[UserPreview]
+    lists: list[BoardListBase]
+    tasks: list[TaskPreview]
+    tags: list[TaskTagBase]

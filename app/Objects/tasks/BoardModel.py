@@ -22,6 +22,7 @@ class Board(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
+    banner_url = Column(Text, nullable=True)
 
     created_by_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"))
 
@@ -40,12 +41,16 @@ class BoardMember(Base):
     role = Column(ENUM(BoardRole), default=BoardRole.MEMBER)
 
 
-# ✅ Pydantic-схема для відповіді
 class BoardBase(PydModel):
     id: uuid.UUID
     name: str
     description: str | None
-    created_at: datetime
+    banner_url: str | None
+    created_at: datetime | None
 
-    class Config:
-        from_attributes = True
+# ✅ Pydantic-схема для відповіді
+class BoardPreview(PydModel):
+    id: uuid.UUID
+    name: str
+    description: str | None
+    created_at: datetime

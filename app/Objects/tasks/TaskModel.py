@@ -32,6 +32,7 @@ class Task(Base):
 
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
+    banner_attachment_id = Column(UUID(as_uuid=True), ForeignKey("TaskAttachments.id"), nullable=True)
     tags = Column(ARRAY(UUID(as_uuid=True)), nullable=True)
 
     created_by_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"))
@@ -76,8 +77,21 @@ class TaskAssignee(Base):
 
 class TaskPreview(PydModel):
     id: uuid.UUID
-    title: str
+    name: str
+    banner_url: str | None = None
     status: TaskStatus
-    priority: TaskPriority
-    assigned_to_id: uuid.UUID | None
-    deadline_at: datetime | None
+    list_id: uuid.UUID | None = None
+    priority: TaskPriority | None = None
+    deadline_at: datetime | None = None
+    assignees: list[uuid.UUID]
+
+class TaskAssigneeBase(PydModel):
+    id: uuid.UUID
+    task_id: uuid.UUID
+    user_id: uuid.UUID
+    role: str | None
+    share: float | None
+    assigned_at: datetime | None
+
+    class Config:
+        from_attributes = True

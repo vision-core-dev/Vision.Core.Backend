@@ -3,7 +3,7 @@ import uuid
 from pydantic import BaseModel
 from datetime import date, time
 
-from app.Objects.EventModel import EventBase, EventInviteBase, EventInviteStatus
+from app.Objects.EventModel import EventBase, EventInviteBase, EventInviteStatus, EventInviteWithUser
 
 
 class CreateEventRequest(BaseModel):
@@ -25,7 +25,7 @@ class ListEventsResponse(BaseModel):
 
 class ModerateEventDetailsResponse(BaseModel):
     event: EventBase
-    invitees: list[EventInviteBase]
+    invitees: list[EventInviteWithUser]
     actions: list[str] = []
 
     class Config:

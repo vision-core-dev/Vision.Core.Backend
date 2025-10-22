@@ -5,6 +5,7 @@ from datetime import datetime, time
 from sqlalchemy import Column, String, DateTime, UUID, TEXT, func, Time
 
 from app.Infrastructure.Database import Base, PydModel
+from app.Objects.UserModel import UserShort
 
 
 class EventInviteStatus(enum.Enum):
@@ -81,3 +82,14 @@ class EventInviteBase(PydModel):
     responded_at: datetime | None
     attended_at: datetime | None
     created_at: datetime
+
+class EventInviteWithUser(PydModel):
+    id: uuid.UUID
+    event_id: uuid.UUID
+    user_id: uuid.UUID
+    status: str
+    reason: str | None = None
+    responded_at: datetime | None = None
+    attended_at: datetime | None = None
+    created_at: datetime
+    user: UserShort

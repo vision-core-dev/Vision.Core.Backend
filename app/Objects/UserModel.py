@@ -90,7 +90,11 @@ class MyUserRoleBase(PydModel):
     menu: list[str]
 
 
-
+class UserShort(BaseModel):
+    id: uuid.UUID
+    first_name: str
+    last_name: str | None = None
+    avatar_url: str | None = None
 
 class UserPreview(PydModel):
     id: uuid.UUID

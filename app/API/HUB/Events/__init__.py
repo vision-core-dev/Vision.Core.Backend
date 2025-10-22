@@ -47,3 +47,24 @@ async def decline_event_invite(
     db: AsyncSession = Depends(getdb)
 ):
     return await EventService(db).ChangeEventInviteStatus(event_id, user, EventInviteStatus.DECLINED)
+
+
+
+@events_router.post("/{event_id}/MarkAttended", response_model=ChangeEventStatusResponse)
+async def mark_event_attended(
+    event_id: uuid.UUID,
+    user_id: uuid.UUID = Query(..., description="ID користувача, якого відмічаємо"),
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    return await EventService(db).MarkAttendance(event_id, user_id, True)
+
+
+@events_router.post("/{event_id}/MarkAbsent", response_model=ChangeEventStatusResponse)
+async def mark_event_absent(
+    event_id: uuid.UUID,
+    user_id: uuid.UUID = Query(..., description="ID користувача, якого відмічаємо"),
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    return await EventService(db).MarkAttendance(event_id, user_id, False)

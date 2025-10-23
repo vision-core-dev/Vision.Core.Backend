@@ -86,3 +86,13 @@ async def rename_task_attachment(task_id: uuid.UUID, attachment_id: uuid.UUID, p
     if new_name is None:
         raise HTTPException(status_code=400, detail="new_name_required")
     return await TaskService(db).RenameAttachment(task_id, attachment_id, new_name, user)
+
+
+@tasks_router.post("/{task_id}/UploadBanner")
+async def upload_task_banner(
+    task_id: uuid.UUID,
+    file: UploadFile = File(...),
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    return await TaskService(db).UploadTaskBanner(task_id, file, user)

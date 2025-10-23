@@ -27,13 +27,6 @@ class TaskService:
         if not task:
             raise HTTPException(status_code=404, detail="task_not_found")
 
-        # 🔹 2. Отримуємо банер (через banner_attachment_id)
-        banner_url = None
-        if task.banner_attachment_id:
-            banner = await self.db.get(TaskAttachment, task.banner_attachment_id)
-            if banner:
-                banner_url = banner.url
-
         # 🔹 3. Теги
         tag_list = []
         if task.tags:
@@ -104,7 +97,7 @@ class TaskService:
             id=task.id,
             name=task.name,
             description=task.description,
-            banner_url=banner_url,
+            banner_url=task.banner_url,
             tags=tag_list,
             assignees=assignee_users,
             attachments=attachments,
@@ -319,5 +312,27 @@ class TaskService:
             "message": "Attachment renamed successfully",
             "attachment_id": str(attachment.id),
             "new_name": attachment.name
+        }
+
+    async def UploadTaskBanner(self, task_id, file, user):
+        # 🔍 Знайти задачу
+        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalar_one_or_none()
+
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        contents = await file.read()
+        filename = f"banners/{task_id}_{uuid.uuid4()}_{file.filename}"
+
+        banner_url = await _upload_to_bunny(filename, contents, file.content_type)
+
+        task.banner_url = banner_url
+        await self.db.commit()
+
+        return {
+            "ok": True,
+            "message": "Task banner uploaded successfully",
+            "banner_url": banner_url
         }
 

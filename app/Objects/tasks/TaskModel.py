@@ -35,11 +35,7 @@ class Task(Base):
 
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    banner_attachment_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("TaskAttachments.id", use_alter=True, name="fk_task_banner_attachment_id"),
-        nullable=True
-    )
+    banner_url = Column(Text, nullable=True)
     tags = Column(ARRAY(UUID(as_uuid=True)), nullable=True)
 
     assignee_ids = Column(ARRAY(UUID(as_uuid=True)), nullable=True)
@@ -63,9 +59,8 @@ class Task(Base):
     board = relationship("Board", backref="Tasks")
     list = relationship("BoardList", backref="Tasks")
     created_by = relationship("User", foreign_keys=[created_by_id])
-    # assignees = relationship("TaskAssignee", back_populates="task", cascade="all, delete-orphan")
     attachments = relationship("TaskAttachment", back_populates="task", cascade="all, delete-orphan", foreign_keys="[TaskAttachment.task_id]")
-    banner_attachment = relationship("TaskAttachment", foreign_keys=[banner_attachment_id])
+
 
 class TaskPreview(PydModel):
     id: uuid.UUID

@@ -57,13 +57,6 @@ class BoardService:
         users_query = (select(User))
         users_result = await self.db.execute(users_query)
         users = users_result.scalars().all()
-        # members_query = (
-        #     select(User)
-        #     .join(Board.members)  # 👈 правильно
-        #     .where(Board.id == board_id)
-        # )
-        # members_result = await self.db.execute(members_query)
-        # members = members_result.scalars().all()
 
         # 🟩 3. Отримуємо списки (колонки)
         lists_result = await self.db.execute(
@@ -103,6 +96,7 @@ class BoardService:
                 TaskPreview(
                     id=t.id,
                     name=t.name,
+                    banner_url=t.banner_url,
                     list_id=t.list_id,
                     tags=t.tags or [],
                     status=t.status,

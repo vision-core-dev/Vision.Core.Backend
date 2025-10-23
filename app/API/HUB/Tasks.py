@@ -46,3 +46,8 @@ async def unassign_tag(task_id: uuid.UUID, payload: dict, db: AsyncSession = Dep
     if not tag_id:
         raise HTTPException(status_code=400, detail="tag_id_required")
     return await TaskService(db).UnassignTag(task_id, uuid.UUID(tag_id))
+
+# 🔹 Архівувати задачу
+@tasks_router.post("/{task_id}/Archive")
+async def archive_task(task_id: uuid.UUID, db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
+    return await TaskService(db).ArchiveTask(task_id, user)

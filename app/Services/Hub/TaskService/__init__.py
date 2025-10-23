@@ -188,3 +188,22 @@ class TaskService:
         )
         await self.db.commit()
         return {"ok": True}
+
+
+    async def ArchiveTask(self, task_id: uuid.UUID, user):
+        # 🔍 Знайти задачу
+        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalar_one_or_none()
+
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        # ⚙️ Позначаємо як архівовану
+        task.is_archived = True
+        await self.db.commit()
+
+        return {
+            "ok": True,
+            "message": f"Task {task.name} archived successfully",
+            "task_id": str(task.id)
+        }

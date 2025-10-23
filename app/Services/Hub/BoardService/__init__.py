@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import HTTPException, UploadFile
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 
 from app.Infrastructure.Storage import _upload_to_bunny, _delete_from_bunny
@@ -74,8 +74,11 @@ class BoardService:
         # 🟩 4. Отримуємо задачі разом з assignees
         tasks_result = await self.db.execute(
             select(Task)
-            .where(Task.board_id == board_id)
-            .order_by(Task.order)
+            .where(
+                Task.board_id == board_id,
+                or_(Task.is_archived.is_(False), Task.is_archived.is_(None)),
+                or_(Task.is_removed.is_(False), Task.is_removed.is_(None))
+            )            .order_by(Task.order)
         )
         tasks = tasks_result.scalars().unique().all()
 
@@ -95,16 +98,6 @@ class BoardService:
                 )
                 for u in users
             ],
-            # members=[
-            #     UserPreview(
-            #         id=m.id,
-            #         first_name=m.first_name,
-            #         last_name=m.last_name,
-            #         avatar_url=m.avatar_url,
-            #         role_name=getattr(m.role, "name", None)
-            #     )
-            #     for m in members
-            # ],
             lists=lists,
             tasks=[
                 TaskPreview(

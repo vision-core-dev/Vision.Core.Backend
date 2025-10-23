@@ -99,6 +99,7 @@ class BoardService:
                     id=t.id,
                     name=t.name,
                     list_id=t.list_id,
+                    tags=t.tags or [],
                     status=t.status,
                     priority=t.priority,
                     deadline_at=t.deadline_at,

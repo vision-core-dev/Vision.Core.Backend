@@ -30,8 +30,8 @@ class Task(Base):
     list_id = Column(UUID(as_uuid=True), ForeignKey("BoardLists.id", ondelete="SET NULL"), nullable=True)
     order = Column(BigInteger, nullable=True)
 
-    is_archived = Column(Boolean, default=False)
-    is_removed = Column(Boolean, default=False)
+    is_archived = Column(Boolean, default=False, server_default="false")
+    is_removed = Column(Boolean, default=False, server_default="false")
 
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)

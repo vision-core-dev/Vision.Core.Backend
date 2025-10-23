@@ -71,4 +71,18 @@ async def update_task_name(task_id: uuid.UUID, payload: dict, db: AsyncSession =
 
 @tasks_router.post("/{task_id}/Attachments/UploadFile")
 async def upload_task_attachment(task_id: uuid.UUID, file: UploadFile = File(...), db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
-    return await TaskService(db).UploadAttachment(task_id, file, user)
+    return await TaskService(db).UploadFileAttachment(task_id, file, user)
+
+@tasks_router.post("/{task_id}/Attachments/RemoveFile")
+async def remove_task_attachment(task_id: uuid.UUID, payload: dict, db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
+    attachment_id = payload.get("attachment_id")
+    if not attachment_id:
+        raise HTTPException(status_code=400, detail="attachment_id_required")
+    return await TaskService(db).RemoveFileAttachment(task_id, uuid.UUID(attachment_id), user)
+
+@tasks_router.post("/{task_id}/Attachments/{attachment_id}/Rename")
+async def rename_task_attachment(task_id: uuid.UUID, attachment_id: uuid.UUID, payload: dict, db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
+    new_name = payload.get("new_name")
+    if new_name is None:
+        raise HTTPException(status_code=400, detail="new_name_required")
+    return await TaskService(db).RenameAttachment(task_id, attachment_id, new_name, user)

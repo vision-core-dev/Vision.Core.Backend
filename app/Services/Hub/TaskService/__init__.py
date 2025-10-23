@@ -247,7 +247,33 @@ class TaskService:
         }
 
 
-    async def UploadAttachment(self, task_id, file, user):
+    async def AddLinkAttachment(self, task_id, url, name, user):
+        # 🔍 Знайти задачу
+        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalar_one_or_none()
+
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        # 🗂️ Створюємо вкладення
+        attachment = TaskAttachment(
+            task_id=task.id,
+            type="link",
+            url=url,
+            name=name
+        )
+        self.db.add(attachment)
+        await self.db.commit()
+        await self.db.refresh(attachment)
+
+        return {
+            "ok": True,
+            "message": "Attachment added successfully",
+            "attachment_id": str(attachment.id),
+            "url": attachment.url
+        }
+
+    async def UploadFileAttachment(self, task_id, file, user):
         # 🔍 Знайти задачу
         result = await self.db.execute(select(Task).where(Task.id == task_id))
         task = result.scalar_one_or_none()
@@ -277,3 +303,21 @@ class TaskService:
             "attachment_id": str(attachment.id),
             "url": attachment.url
         }
+
+    async def RenameAttachment(self, task_id, attachment_id, new_name, user):
+        # 🔍 Знайти вкладення
+        attachment = await self.db.get(TaskAttachment, attachment_id)
+        if not attachment or attachment.task_id != task_id:
+            raise HTTPException(status_code=404, detail="attachment_not_found")
+
+        # ✏️ Оновлюємо назву
+        attachment.name = new_name
+        await self.db.commit()
+
+        return {
+            "ok": True,
+            "message": "Attachment renamed successfully",
+            "attachment_id": str(attachment.id),
+            "new_name": attachment.name
+        }
+

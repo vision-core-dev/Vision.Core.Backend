@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, UUID, String, ForeignKey, func, DateTime, Text
+from sqlalchemy import Column, UUID, String, ForeignKey, func, DateTime, Text, Boolean
 from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.orm import relationship
 
@@ -25,6 +25,8 @@ class Board(Base):
     banner_url = Column(Text, nullable=True)
 
     created_by_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"))
+
+    is_removed = Column(Boolean, default=False, server_default="false")
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

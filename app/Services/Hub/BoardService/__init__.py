@@ -30,7 +30,7 @@ class BoardService:
         return CreateBoardResponse(board_id=new_board.id)
 
     async def GetBoardsList(self) -> BoardsListResponse:
-        result = await self.db.execute(select(Board))
+        result = await self.db.execute(select(Board).where(Board.is_removed == False))
         boards = result.scalars().all()
 
         previews = [

@@ -28,7 +28,7 @@ class UserService:
 
     async def GetUsersList(self) -> UsersListResponse:
         stmt = await self.db.execute(
-            select(User).options(selectinload(User.role))
+            select(User).where(User.is_active == True).options(selectinload(User.role))
         )
         result = stmt.scalars().all()
         return UsersListResponse(total=len(result), list=result)

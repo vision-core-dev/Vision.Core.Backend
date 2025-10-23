@@ -1,4 +1,6 @@
 import uuid
+from datetime import datetime
+
 from fastapi import HTTPException
 from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
@@ -102,6 +104,9 @@ class TaskService:
             banner_url=task.banner_url,
             tags=tag_list,
             assignees=assignee_users,
+            started_at=task.started_at,
+            deadline_at=task.deadline_at,
+            completed_at=task.completed_at,
             attachments=attachments,
             comments=comments,
             created_by=UserPreview(
@@ -433,4 +438,47 @@ class TaskService:
             "message": "Task reordered successfully",
             "task_id": str(task.id),
             "new_order": new_order,
+        }
+
+    async def UpdateTaskDates(self, task_id, deadline_at, started_at, completed_at, user):
+        # 🔍 Знаходимо задачу
+        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalar_one_or_none()
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        # 🧭 Функція для безпечної конвертації
+        def parse_date(value):
+            if not value:
+                return None
+            if isinstance(value, datetime):
+                return value
+            try:
+                # ⏰ datetime-local -> datetime object
+                return datetime.fromisoformat(value)
+            except Exception:
+                return None
+
+        # 🗓️ Конвертуємо в datetime перед оновленням
+        started_at_dt = parse_date(started_at)
+        deadline_at_dt = parse_date(deadline_at)
+        completed_at_dt = parse_date(completed_at)
+
+        # 🧮 Оновлюємо дати
+        if started_at_dt is not None:
+            task.started_at = started_at_dt
+        if deadline_at_dt is not None:
+            task.deadline_at = deadline_at_dt
+        if completed_at_dt is not None:
+            task.completed_at = completed_at_dt
+
+        await self.db.commit()
+
+        return {
+            "ok": True,
+            "message": "Task dates updated successfully",
+            "task_id": str(task.id),
+            "deadline_at": task.deadline_at,
+            "started_at": task.started_at,
+            "completed_at": task.completed_at,
         }

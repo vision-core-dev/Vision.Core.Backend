@@ -139,3 +139,22 @@ async def set_task_order(
     if order is None and list_id is None:
         raise HTTPException(status_code=400, detail="new_order_required")
     return await TaskService(db).SetTaskOrder(task_id, order, list_id, user)
+
+
+@tasks_router.post("/{task_id}/UpdateDates")
+async def update_dates(
+    task_id: uuid.UUID,
+    payload: dict,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    deadline_at = payload.get("deadline_at")
+    started_at = payload.get("started_at")
+    completed_at = payload.get("completed_at")
+    return await TaskService(db).UpdateTaskDates(
+        task_id,
+        deadline_at=deadline_at,
+        started_at=started_at,
+        completed_at=completed_at,
+        user=user
+    )

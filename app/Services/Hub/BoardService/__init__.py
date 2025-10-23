@@ -101,6 +101,7 @@ class BoardService:
                     tags=t.tags or [],
                     status=t.status,
                     priority=t.priority,
+                    started_at=t.started_at,
                     deadline_at=t.deadline_at,
                     assignees=t.assignee_ids or []
                 )

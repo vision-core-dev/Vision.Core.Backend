@@ -40,6 +40,9 @@ class TaskDetailsResponse(BaseModel):
     banner_url: Optional[str] = None
     tags: List[TagPreview]
     assignees: List[UserPreview]
+    started_at: Optional[datetime]
+    deadline_at: Optional[datetime]
+    completed_at: Optional[datetime]
     attachments: List[AttachmentPreview]
     comments: List[CommentPreview]
     created_by: UserPreview

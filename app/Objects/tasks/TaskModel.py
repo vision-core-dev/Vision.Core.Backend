@@ -70,6 +70,7 @@ class TaskPreview(PydModel):
     status: TaskStatus | None = None
     list_id: uuid.UUID | None = None
     priority: TaskPriority | None = None
+    started_at: datetime | None = None
     deadline_at: datetime | None = None
     assignees: list[uuid.UUID]
 

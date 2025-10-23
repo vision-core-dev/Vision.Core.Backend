@@ -54,13 +54,16 @@ class BoardService:
             raise HTTPException(status_code=404, detail="board_not_found")
 
         # 🟩 2. Отримуємо учасників (many-to-many)
-        members_query = (
-            select(User)
-            .join(Board.members)  # 👈 правильно
-            .where(Board.id == board_id)
-        )
-        members_result = await self.db.execute(members_query)
-        members = members_result.scalars().all()
+        users_query = (select(User))
+        users_result = await self.db.execute(users_query)
+        users = users_result.scalars().all()
+        # members_query = (
+        #     select(User)
+        #     .join(Board.members)  # 👈 правильно
+        #     .where(Board.id == board_id)
+        # )
+        # members_result = await self.db.execute(members_query)
+        # members = members_result.scalars().all()
 
         # 🟩 3. Отримуємо списки (колонки)
         lists_result = await self.db.execute(
@@ -83,16 +86,25 @@ class BoardService:
         # 🟩 6. Формуємо відповідь
         return BoardDetailsResponse(
             board=board,
-            members=[
+            users=[
                 UserPreview(
-                    id=m.id,
-                    first_name=m.first_name,
-                    last_name=m.last_name,
-                    avatar_url=m.avatar_url,
-                    role_name=getattr(m.role, "name", None)
+                    id=u.id,
+                    first_name=u.first_name,
+                    last_name=u.last_name,
+                    avatar_url=u.avatar_url,
                 )
-                for m in members
+                for u in users
             ],
+            # members=[
+            #     UserPreview(
+            #         id=m.id,
+            #         first_name=m.first_name,
+            #         last_name=m.last_name,
+            #         avatar_url=m.avatar_url,
+            #         role_name=getattr(m.role, "name", None)
+            #     )
+            #     for m in members
+            # ],
             lists=lists,
             tasks=[
                 TaskPreview(

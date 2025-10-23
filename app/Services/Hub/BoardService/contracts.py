@@ -24,7 +24,8 @@ class BoardsListResponse(BaseModel):
 
 class BoardDetailsResponse(BaseModel):
     board: BoardBase
-    members: list[UserPreview]
+    users: list[UserPreview]
+    # members: list[UserPreview]
     lists: list[BoardListBase]
     tasks: list[TaskPreview]
     tags: list[TaskTagBase]

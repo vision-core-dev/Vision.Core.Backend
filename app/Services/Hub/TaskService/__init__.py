@@ -96,6 +96,7 @@ class TaskService:
         # ✅ 8. Формуємо фінальну відповідь
         return TaskDetailsResponse(
             id=task.id,
+            list_id=task.list_id,
             name=task.name,
             description=task.description,
             banner_url=task.banner_url,
@@ -374,4 +375,22 @@ class TaskService:
             "ok": True,
             "message": "Task banner updated successfully",
             "banner_url": task.banner_url
+        }
+
+    async def MoveTaskToList(self, task_id, list_id, user):
+        # 🔍 Знайти задачу
+        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalar_one_or_none()
+
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        # Оновлюємо список
+        task.list_id = list_id
+        await self.db.commit()
+
+        return {
+            "ok": True,
+            "message": "Task moved to new list successfully",
+            "list_id": str(task.list_id)
         }

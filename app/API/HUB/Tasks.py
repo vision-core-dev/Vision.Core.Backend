@@ -113,3 +113,15 @@ async def set_task_banner(
     if not banner_url:
         raise HTTPException(status_code=400, detail="banner_url_required")
     return await TaskService(db).SetTaskBanner(task_id, banner_url, user)
+
+@tasks_router.post("/{task_id}/MoveToList")
+async def move_task_to_list(
+    task_id: uuid.UUID,
+    payload: dict,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    list_id = payload.get("list_id")
+    if not list_id:
+        raise HTTPException(status_code=400, detail="list_id_required")
+    return await TaskService(db).MoveTaskToList(task_id, uuid.UUID(list_id), user)

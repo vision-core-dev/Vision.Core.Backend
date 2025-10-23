@@ -34,6 +34,7 @@ class CommentPreview(BaseModel):
 
 class TaskDetailsResponse(BaseModel):
     id: uuid.UUID
+    list_id: uuid.UUID
     name: str
     description: Optional[str]
     banner_url: Optional[str] = None

@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
+from app.Infrastructure.Storage import _upload_to_bunny
 from app.Objects.tasks.TaskAttachment import TaskAttachment, TaskComment
 from app.Objects.tasks.TaskModel import Task
 from app.Objects.tasks.TaskTags import TaskTag
@@ -206,4 +207,73 @@ class TaskService:
             "ok": True,
             "message": f"Task {task.name} archived successfully",
             "task_id": str(task.id)
+        }
+
+
+    async def UpdateTaskDescription(self, task_id: uuid.UUID, description: str, user):
+        # 🔍 Знайти задачу
+        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalar_one_or_none()
+
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        # ✏️ Оновлюємо опис
+        task.description = description
+        await self.db.commit()
+
+        return {
+            "ok": True,
+            "message": f"Task {task.name} description updated successfully",
+            "task_id": str(task.id)
+        }
+
+    async def UpdateTaskName(self, task_id: uuid.UUID, name: str, user):
+        # 🔍 Знайти задачу
+        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalar_one_or_none()
+
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        # ✏️ Оновлюємо назву
+        task.name = name
+        await self.db.commit()
+
+        return {
+            "ok": True,
+            "message": f"Task name updated successfully",
+            "task_id": str(task.id)
+        }
+
+
+    async def UploadAttachment(self, task_id, file, user):
+        # 🔍 Знайти задачу
+        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalar_one_or_none()
+
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        contents = await file.read()
+        filename = f"uploads/{user.id}_{uuid.uuid4()}_{file.filename}"
+
+        file_url = await _upload_to_bunny(filename, contents, file.content_type)
+
+        # 🗂️ Створюємо вкладення
+        attachment = TaskAttachment(
+            task_id=task.id,
+            type="file",
+            url=file_url,  # Тут має бути логіка збереження файлу
+            name=file.filename
+        )
+        self.db.add(attachment)
+        await self.db.commit()
+        await self.db.refresh(attachment)
+
+        return {
+            "ok": True,
+            "message": "Attachment uploaded successfully",
+            "attachment_id": str(attachment.id),
+            "url": attachment.url
         }

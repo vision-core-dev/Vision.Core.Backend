@@ -1,5 +1,5 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.Infrastructure.Database import getdb
@@ -51,3 +51,24 @@ async def unassign_tag(task_id: uuid.UUID, payload: dict, db: AsyncSession = Dep
 @tasks_router.post("/{task_id}/Archive")
 async def archive_task(task_id: uuid.UUID, db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
     return await TaskService(db).ArchiveTask(task_id, user)
+
+
+@tasks_router.post("/{task_id}/UpdateDescription")
+async def update_task_description(task_id: uuid.UUID, payload: dict, db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
+    description = payload.get("description")
+    if description is None:
+        raise HTTPException(status_code=400, detail="description_required")
+    return await TaskService(db).UpdateTaskDescription(task_id, description, user)
+
+
+@tasks_router.post("/{task_id}/UpdateName")
+async def update_task_name(task_id: uuid.UUID, payload: dict, db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
+    name = payload.get("name")
+    if name is None:
+        raise HTTPException(status_code=400, detail="name_required")
+    return await TaskService(db).UpdateTaskName(task_id, name, user)
+
+
+@tasks_router.post("/{task_id}/Attachments/UploadFile")
+async def upload_task_attachment(task_id: uuid.UUID, file: UploadFile = File(...), db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
+    return await TaskService(db).UploadAttachment(task_id, file, user)

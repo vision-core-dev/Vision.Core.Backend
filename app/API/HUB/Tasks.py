@@ -73,12 +73,9 @@ async def update_task_name(task_id: uuid.UUID, payload: dict, db: AsyncSession =
 async def upload_task_attachment(task_id: uuid.UUID, file: UploadFile = File(...), db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
     return await TaskService(db).UploadFileAttachment(task_id, file, user)
 
-@tasks_router.post("/{task_id}/Attachments/RemoveFile")
-async def remove_task_attachment(task_id: uuid.UUID, payload: dict, db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
-    attachment_id = payload.get("attachment_id")
-    if not attachment_id:
-        raise HTTPException(status_code=400, detail="attachment_id_required")
-    return await TaskService(db).RemoveFileAttachment(task_id, uuid.UUID(attachment_id), user)
+@tasks_router.post("/{task_id}/Attachments/{attachment_id}/Remove")
+async def remove_task_attachment(task_id: uuid.UUID, attachment_id: uuid.UUID, db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
+    return await TaskService(db).RemoveAttachment(task_id, attachment_id, user)
 
 @tasks_router.post("/{task_id}/Attachments/{attachment_id}/Rename")
 async def rename_task_attachment(task_id: uuid.UUID, attachment_id: uuid.UUID, payload: dict, db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
@@ -96,3 +93,15 @@ async def upload_task_banner(
     db: AsyncSession = Depends(getdb)
 ):
     return await TaskService(db).UploadTaskBanner(task_id, file, user)
+
+@tasks_router.post("/{task_id}/SetBanner")
+async def set_task_banner(
+    task_id: uuid.UUID,
+    payload: dict,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    banner_url = payload.get("banner_url")
+    if not banner_url:
+        raise HTTPException(status_code=400, detail="banner_url_required")
+    return await TaskService(db).SetTaskBanner(task_id, banner_url, user)

@@ -314,6 +314,22 @@ class TaskService:
             "new_name": attachment.name
         }
 
+    async def RemoveAttachment(self, task_id, attachment_id, user):
+        # 🔍 Знайти вкладення
+        attachment = await self.db.get(TaskAttachment, attachment_id)
+        if not attachment or attachment.task_id != task_id:
+            raise HTTPException(status_code=404, detail="attachment_not_found")
+
+        # ❌ Видаляємо вкладення
+        await self.db.delete(attachment)
+        await self.db.commit()
+
+        return {
+            "ok": True,
+            "message": "Attachment removed successfully",
+            "attachment_id": str(attachment.id)
+        }
+
     async def UploadTaskBanner(self, task_id, file, user):
         # 🔍 Знайти задачу
         result = await self.db.execute(select(Task).where(Task.id == task_id))
@@ -336,3 +352,20 @@ class TaskService:
             "banner_url": banner_url
         }
 
+    async def SetTaskBanner(self, task_id, banner_url, user):
+        # 🔍 Знайти задачу
+        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalar_one_or_none()
+
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        # Оновлюємо банер
+        task.banner_url = banner_url
+        await self.db.commit()
+
+        return {
+            "ok": True,
+            "message": "Task banner updated successfully",
+            "banner_url": task.banner_url
+        }

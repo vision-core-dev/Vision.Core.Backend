@@ -394,3 +394,43 @@ class TaskService:
             "message": "Task moved to new list successfully",
             "list_id": str(task.list_id)
         }
+
+    async def SetTaskOrder(self, task_id: uuid.UUID, order: int | None, list_id: uuid.UUID, user):
+        # 🔍 Знаходимо задачу
+        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalar_one_or_none()
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        # 🔍 Отримуємо всі задачі у цільовому списку
+        result = await self.db.execute(
+            select(Task).where(Task.list_id == list_id).order_by(Task.order.asc())
+        )
+        tasks = result.scalars().all()
+
+        # 🧮 Обчислюємо новий order
+        if not tasks:
+            new_order = 1000  # якщо список порожній
+        elif order is None or order >= len(tasks):
+            # додаємо в кінець
+            new_order = tasks[-1].order + 1000
+        elif order <= 0:
+            # додаємо на початок
+            new_order = tasks[0].order - 1000
+        else:
+            # між задачами
+            prev_task = tasks[order - 1]
+            next_task = tasks[order]
+            new_order = (prev_task.order + next_task.order) / 2
+
+        # 🧩 Оновлюємо задачу
+        task.order = new_order
+        task.list_id = list_id
+        await self.db.commit()
+
+        return {
+            "ok": True,
+            "message": "Task reordered successfully",
+            "task_id": str(task.id),
+            "new_order": new_order,
+        }

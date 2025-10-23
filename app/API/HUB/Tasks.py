@@ -125,3 +125,17 @@ async def move_task_to_list(
     if not list_id:
         raise HTTPException(status_code=400, detail="list_id_required")
     return await TaskService(db).MoveTaskToList(task_id, uuid.UUID(list_id), user)
+
+
+@tasks_router.post("/{task_id}/SetTaskOrder")
+async def set_task_order(
+    task_id: uuid.UUID,
+    payload: dict,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    order = payload.get("order")
+    list_id = payload.get("list_id")
+    if order is None and list_id is None:
+        raise HTTPException(status_code=400, detail="new_order_required")
+    return await TaskService(db).SetTaskOrder(task_id, order, list_id, user)

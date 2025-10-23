@@ -28,7 +28,7 @@ class Task(Base):
 
     board_id = Column(UUID(as_uuid=True), ForeignKey("Boards.id", ondelete="SET NULL"), nullable=True)
     list_id = Column(UUID(as_uuid=True), ForeignKey("BoardLists.id", ondelete="SET NULL"), nullable=True)
-    order = Column(BigInteger, nullable=True)
+    order = Column(Numeric(10, 2), nullable=True, index=True)
 
     is_archived = Column(Boolean, default=False, server_default="false")
     is_removed = Column(Boolean, default=False, server_default="false")

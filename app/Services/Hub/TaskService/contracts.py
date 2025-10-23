@@ -22,6 +22,7 @@ class AttachmentPreview(BaseModel):
     type: str
     url: str
     name: Optional[str] = None
+    created_at: datetime | None = None
 
 
 class CommentPreview(BaseModel):

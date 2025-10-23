@@ -73,6 +73,14 @@ async def update_task_name(task_id: uuid.UUID, payload: dict, db: AsyncSession =
 async def upload_task_attachment(task_id: uuid.UUID, file: UploadFile = File(...), db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
     return await TaskService(db).UploadFileAttachment(task_id, file, user)
 
+@tasks_router.post("/{task_id}/Attachments/AddLink")
+async def add_task_link_attachment(task_id: uuid.UUID, payload: dict, db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
+    link_url = payload.get("url")
+    name = payload.get("name")
+    if link_url is None:
+        raise HTTPException(status_code=400, detail="link_url_required")
+    return await TaskService(db).AddLinkAttachment(task_id, link_url, name, user)
+
 @tasks_router.post("/{task_id}/Attachments/{attachment_id}/Remove")
 async def remove_task_attachment(task_id: uuid.UUID, attachment_id: uuid.UUID, db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
     return await TaskService(db).RemoveAttachment(task_id, attachment_id, user)

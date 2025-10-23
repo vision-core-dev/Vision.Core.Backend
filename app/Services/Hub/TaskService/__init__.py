@@ -59,7 +59,8 @@ class TaskService:
                 id=a.id,
                 type=a.type.value if hasattr(a.type, "value") else str(a.type),
                 url=a.url,
-                name=a.name
+                name=a.name,
+                created_at=a.created_at,
             )
             for a in attachments_result.scalars().all()
         ]
@@ -247,6 +248,11 @@ class TaskService:
 
         if not task:
             raise HTTPException(status_code=404, detail="task_not_found")
+
+        if not url.startswith("http://") and not url.startswith("https://"):
+            url = "https://" + url
+
+        name = name or url
 
         # 🗂️ Створюємо вкладення
         attachment = TaskAttachment(

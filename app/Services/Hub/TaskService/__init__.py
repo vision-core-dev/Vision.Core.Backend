@@ -1,12 +1,11 @@
 import uuid
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
 from app.Objects.tasks.TaskAttachment import TaskAttachment, TaskComment
 from app.Objects.tasks.TaskModel import Task
 from app.Objects.tasks.TaskTags import TaskTag
-from app.Objects.tasks.TaskModel import TaskAssignee
 from app.Objects.UserModel import User
 from app.Services.Hub.TaskService.contracts import (
     TaskDetailsResponse, UserPreview, TagPreview, AttachmentPreview, CommentPreview
@@ -22,7 +21,6 @@ class TaskService:
         result = await self.db.execute(
             select(Task)
             .where(Task.id == task_id)
-            .options(selectinload(Task.assignees))
         )
         task = result.scalar_one_or_none()
         if not task:
@@ -46,9 +44,8 @@ class TaskService:
 
         # 🔹 4. Виконавці
         assignee_users = []
-        if task.assignees:
-            user_ids = [a.user_id for a in task.assignees]
-            q_users = await self.db.execute(select(User).where(User.id.in_(user_ids)))
+        if task.assignee_ids:
+            q_users = await self.db.execute(select(User).where(User.id.in_(task.assignee_ids)))
             assignee_users = [
                 UserPreview(
                     id=u.id,
@@ -119,3 +116,75 @@ class TaskService:
             ),
             created_at=task.created_at
         )
+
+    # ✅ Призначити користувача
+    async def AssignUser(self, task_id: uuid.UUID, user_id: uuid.UUID):
+        task = await self.db.get(Task, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        current_ids = set(task.assignee_ids or [])
+        if user_id in current_ids:
+            return {"ok": True, "message": "already_assigned"}
+
+        current_ids.add(user_id)
+        await self.db.execute(
+            update(Task).where(Task.id == task_id).values(assignee_ids=list(current_ids))
+        )
+        await self.db.commit()
+        return {"ok": True}
+
+    # ❌ Зняти користувача
+    async def UnassignUser(self, task_id: uuid.UUID, user_id: uuid.UUID):
+        task = await self.db.get(Task, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        current_ids = set(task.assignee_ids or [])
+        if user_id not in current_ids:
+            return {"ok": True, "message": "not_assigned"}
+
+        current_ids.remove(user_id)
+        await self.db.execute(
+            update(Task).where(Task.id == task_id).values(assignee_ids=list(current_ids))
+        )
+        await self.db.commit()
+        return {"ok": True}
+
+    # 🏷️ Додати мітку
+    async def AssignTag(self, task_id: uuid.UUID, tag_id: uuid.UUID):
+        tag = await self.db.get(TaskTag, tag_id)
+        if not tag:
+            raise HTTPException(status_code=404, detail="tag_not_found")
+
+        task = await self.db.get(Task, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        current_tags = set(task.tags or [])
+        if tag_id in current_tags:
+            return {"ok": True, "message": "already_tagged"}
+
+        current_tags.add(tag_id)
+        await self.db.execute(
+            update(Task).where(Task.id == task_id).values(tags=list(current_tags))
+        )
+        await self.db.commit()
+        return {"ok": True}
+
+    # ❌ Зняти мітку
+    async def UnassignTag(self, task_id: uuid.UUID, tag_id: uuid.UUID):
+        task = await self.db.get(Task, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        current_tags = set(task.tags or [])
+        if tag_id not in current_tags:
+            return {"ok": True, "message": "not_tagged"}
+
+        current_tags.remove(tag_id)
+        await self.db.execute(
+            update(Task).where(Task.id == task_id).values(tags=list(current_tags))
+        )
+        await self.db.commit()
+        return {"ok": True}

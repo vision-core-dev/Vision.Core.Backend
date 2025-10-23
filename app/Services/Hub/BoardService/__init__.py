@@ -9,7 +9,7 @@ from app.Infrastructure.Storage import _upload_to_bunny, _delete_from_bunny
 from app.Objects.UserModel import User, UserPreview
 from app.Objects.tasks.BoardListModel import BoardList
 from app.Objects.tasks.BoardModel import Board
-from app.Objects.tasks.TaskModel import Task, TaskPreview, TaskAssignee
+from app.Objects.tasks.TaskModel import Task, TaskPreview
 from app.Objects.tasks.TaskTags import TaskTag
 from app.Services.Hub.BoardService.contracts import CreateBoardResponse, BoardsListResponse, BoardDetailsResponse
 
@@ -72,7 +72,6 @@ class BoardService:
         tasks_result = await self.db.execute(
             select(Task)
             .where(Task.board_id == board_id)
-            .options(selectinload(Task.assignees))
             .order_by(Task.order)
         )
         tasks = tasks_result.scalars().unique().all()
@@ -103,7 +102,7 @@ class BoardService:
                     status=t.status,
                     priority=t.priority,
                     deadline_at=t.deadline_at,
-                    assignees=[a.user_id for a in t.assignees]
+                    assignees=t.assignee_ids or []
                 )
                 for t in tasks
             ],
@@ -244,16 +243,12 @@ class BoardService:
             priority=priority or "low",
             deadline_at=deadline_at,
             order=new_order,
-            value_uah=value_uah or 0.0
+            value_uah=value_uah or 0.0,
+            assignee_ids=assignee_ids or []
         )
 
         self.db.add(task)
         await self.db.flush()  # потрібно, щоб отримати ID
-
-        # ✅ Призначаємо виконавців
-        if assignee_ids:
-            for uid in assignee_ids:
-                self.db.add(TaskAssignee(task_id=task.id, user_id=uid))
 
         await self.db.commit()
         await self.db.refresh(task)

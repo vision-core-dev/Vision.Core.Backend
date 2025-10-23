@@ -55,7 +55,7 @@ class User(Base):
         secondary="BoardMembers",
         back_populates="members"
     )
-    assigned_tasks = relationship("TaskAssignee", back_populates="user", cascade="all, delete-orphan")
+    # assigned_tasks = relationship("TaskAssignee", back_populates="user", cascade="all, delete-orphan")
 
 
 

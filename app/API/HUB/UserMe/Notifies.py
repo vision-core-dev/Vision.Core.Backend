@@ -13,10 +13,6 @@ notifies_router = APIRouter(prefix="/Notifies", tags=["Hub > UserMe > Notifies"]
 async def list_notifies(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
     return await NotifyService(db).GetNotifiesList(user)
 
-@notifies_router.get("/UnreadCount", response_model=UnreadNotifiesCountResponse, dependencies=[Depends(HTTPBearer(auto_error=False))])
-async def get_unread_notifies_count(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
-    return await NotifyService(db).GetUnreadNotifiesCount(user)
-
 @notifies_router.post("/MarkAsRead/{notify_id}", dependencies=[Depends(HTTPBearer(auto_error=False))])
 async def mark_notify_as_read(notify_id: str, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
     return await NotifyService(db).MarkNotificationAsRead(user, notify_id)

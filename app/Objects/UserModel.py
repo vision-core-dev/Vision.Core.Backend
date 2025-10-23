@@ -29,6 +29,7 @@ class User(Base):
     currency = Column(ENUM(Currency), nullable=False, server_default="UAH")
 
     is_active = Column(Boolean, nullable=False, server_default=sql.expression.true())
+    is_balance_visible = Column(Boolean, nullable=False, server_default=sql.expression.false())
 
     # ✅ Додаємо ForeignKey до UserRoles.id
     role_id = Column(UUID(as_uuid=True), ForeignKey("UserRoles.id", ondelete="SET NULL"), nullable=True)
@@ -128,3 +129,5 @@ class MeUserBase(PydModel):
     first_name: Optional[str]
     last_name: Optional[str]
     avatar_url: Optional[str]
+    is_balance_visible: bool
+    balance: float

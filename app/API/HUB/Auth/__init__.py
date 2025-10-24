@@ -15,7 +15,10 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(getdb)):
     return await AuthService(db).Login(data.email, data.password)
 
 @auth_router.get("/CheckMe", response_model=CheckMeResponse, dependencies=[Depends(HTTPBearer(auto_error=False))])
-async def me(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+async def me(
+    user: User = Depends(lambda db=Depends(getdb), token=Depends(get_token): _get_user_by_token(db, token, is_check_me=True)),
+    db: AsyncSession = Depends(getdb)
+):
     return await AuthService(db).CheckMe(user)
 
 

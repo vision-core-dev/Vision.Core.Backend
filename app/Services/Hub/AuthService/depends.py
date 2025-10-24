@@ -41,8 +41,9 @@ async def get_token(
 async def getuser(
     db: AsyncSession = Depends(getdb),
     token: uuid.UUID = Depends(get_token),
+    is_accepting_terms: bool = False,
 ):
-    return await _get_user_by_token(db, token)
+    return await _get_user_by_token(db, token, is_accepting_terms)
 
 
 def require_terms_accepted(user: User):
@@ -57,32 +58,21 @@ async def _get_user_by_token(
 ):
     q = (
         select(User)
-        .options(selectinload(User.role))  # ✅ роль одразу підвантажується
+        .options(selectinload(User.role))
         .filter(User.temp_token == token)
     )
-
     result = await db.execute(q)
     user = result.scalar_one_or_none()
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="user_not_found",
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user_not_found")
 
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="user_is_deactivated",
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user_is_deactivated")
 
-    if is_accepting_terms == True:
-        if user.is_need_accept_terms and not user.is_terms_accepted:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="terms_not_accepted",
-            )
+    # 🔥 Блокуємо лише якщо він ще не прийняв оферту і зараз НЕ намагається її прийняти
+    if not is_accepting_terms and user.is_need_accept_terms and not user.is_terms_accepted:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="terms_not_accepted")
 
     _ = user.role.order
-
     return user

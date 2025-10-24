@@ -6,7 +6,7 @@ from app.Infrastructure.Database import getdb
 from app.Objects.UserModel import User
 from app.Services.Hub.AuthService import AuthService, CheckMeResponse, LoginResponse
 from app.Services.Hub.AuthService.contracts import LoginRequest
-from app.Services.Hub.AuthService.depends import getuser
+from app.Services.Hub.AuthService.depends import getuser, get_token, _get_user_by_token
 
 auth_router = APIRouter(prefix="/Auth", tags=["Hub > Auth"])
 
@@ -20,5 +20,8 @@ async def me(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
 
 
 @auth_router.post("/AcceptOffer")
-async def accept_offer(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+async def accept_offer(
+    user: User = Depends(lambda db=Depends(getdb), token=Depends(get_token): _get_user_by_token(db, token, is_accepting_terms=True)),
+    db: AsyncSession = Depends(getdb)
+):
     return await AuthService(db).AcceptOffer(user)

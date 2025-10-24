@@ -44,9 +44,16 @@ async def getuser(
 ):
     return await _get_user_by_token(db, token)
 
+
+def require_terms_accepted(user: User):
+    if user.is_need_accept_terms and not user.is_terms_accepted:
+        raise HTTPException(status_code=403, detail="terms_not_accepted")
+
+
 async def _get_user_by_token(
     db: AsyncSession,
     token: uuid.UUID,
+    is_accepting_terms: bool = False,
 ):
     q = (
         select(User)
@@ -69,7 +76,13 @@ async def _get_user_by_token(
             detail="user_is_deactivated",
         )
 
-    _ = user.role.order
+    if is_accepting_terms == True:
+        if user.is_need_accept_terms and not user.is_terms_accepted:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="terms_not_accepted",
+            )
 
+    _ = user.role.order
 
     return user

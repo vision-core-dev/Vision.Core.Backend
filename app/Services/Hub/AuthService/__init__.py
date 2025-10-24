@@ -61,9 +61,6 @@ class AuthService:
         if not role:
             raise HTTPException(status_code=404, detail="role_not_found")
 
-        if user.is_need_accept_terms and not user.is_terms_accepted:
-            raise HTTPException(status_code=403, detail="terms_not_accepted")
-
         user.last_login = func.now()
         await self.db.commit()
         await self.db.refresh(user)

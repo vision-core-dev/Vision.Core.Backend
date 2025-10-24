@@ -202,7 +202,7 @@ class UserService:
         target_role = await self.db.get(UserRole, user.role_id)
 
         if actor.id != user_id:
-            if actor_role.order < target_role.order:
+            if target_role.order < actor_role.order:
                 raise HTTPException(status_code=403, detail="insufficient_permissions")
 
         if len(new_password) < 8:

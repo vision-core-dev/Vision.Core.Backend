@@ -47,9 +47,19 @@ async def getuser(
     return await _get_user_by_token(db, token, is_accepting_terms, is_check_me)
 
 
-def require_terms_accepted(user: User):
-    if user.is_need_accept_terms and not user.is_terms_accepted:
-        raise HTTPException(status_code=403, detail="terms_not_accepted")
+# Дозволяє перевірку користувача (CheckMe)
+async def getuser_check_me(
+    db: AsyncSession = Depends(getdb),
+    token: uuid.UUID = Depends(get_token),
+):
+    return await _get_user_by_token(db, token, is_check_me=True)
+
+# Дозволяє AcceptOffer навіть без terms
+async def getuser_accepting_terms(
+    db: AsyncSession = Depends(getdb),
+    token: uuid.UUID = Depends(get_token),
+):
+    return await _get_user_by_token(db, token, is_accepting_terms=True)
 
 
 async def _get_user_by_token(
@@ -63,18 +73,20 @@ async def _get_user_by_token(
         .options(selectinload(User.role))
         .filter(User.temp_token == token)
     )
+
     result = await db.execute(q)
     user = result.scalar_one_or_none()
 
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user_not_found")
+        raise HTTPException(status_code=401, detail="user_not_found")
 
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user_is_deactivated")
+        raise HTTPException(status_code=401, detail="user_is_deactivated")
 
-    if not is_accepting_terms and user.is_need_accept_terms and not user.is_terms_accepted:
-        if not is_check_me:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="terms_not_accepted")
+    # 🧠 Якщо не акцепт і не CheckMe — блокуємо
+    if not (is_accepting_terms or is_check_me):
+        if user.is_need_accept_terms and not user.is_terms_accepted:
+            raise HTTPException(status_code=403, detail="terms_not_accepted")
 
     _ = user.role.order
     return user

@@ -50,3 +50,6 @@ class DetailsUserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ChangeUserPasswordRequest(BaseModel):
+    new_password: str

@@ -1,6 +1,7 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.Infrastructure.Database import getdb
@@ -8,7 +9,7 @@ from app.Objects.UserModel import User
 from app.Services.Hub.AuthService.depends import getuser
 from app.Services.Hub.UserService import UserService
 from app.Services.Hub.UserService.contracts import CreateUserResponse, UsersListResponse, UserDetailsResponse, \
-    CreateUserRequest
+    CreateUserRequest, ChangeUserPasswordRequest
 
 users_router = APIRouter(prefix="/Users", tags=["Hub > Users"])
 
@@ -42,6 +43,12 @@ async def delete_user(user_id: uuid.UUID, user: User = Depends(getuser), db: Asy
 @users_router.post("/{user_id}/Activate")
 async def delete_user(user_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
     return await UserService(db).ActivateUser(user_id, user)
+
+@users_router.post("/{user_id}/ChangePassword", dependencies=[Depends(HTTPBearer(auto_error=False))])
+async def reset_user_password(user_id: uuid.UUID, data: ChangeUserPasswordRequest, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    if not data.new_password:
+        return HTTPException(status_code=400, detail="no_new_password")
+    return await UserService(db).ChangeUserPassword(user_id, data.new_password, user)
 
 @users_router.post("/{user_id}/ChangeRole/{new_role_id}")
 async def change_user_role(user_id: uuid.UUID, new_role_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):

@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload, joinedload
 
 from app.Objects.BadgeModel import UserBadge, Badge, UserBadgeBase
 from app.Objects.UserModel import User, UserRole
-from app.Services.Hub.AuthService import AuthService
+from app.Services.Hub.AuthService import AuthService, get_hashed_password
 from app.Services.Hub.UserService.contracts import (
     UsersListResponse,
     UserDetailsResponse,
@@ -192,3 +192,25 @@ class UserService:
         subordinate.supervisor_ids = [sid for sid in (subordinate.supervisor_ids or []) if sid != user_id]
         await self.db.commit()
         return await self.GetUserDetails(user_id, actor)
+
+    async def ChangeUserPassword(self, user_id: uuid.UUID, new_password: str, actor: User):
+        user = await self.db.get(User, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="user_not_found")
+
+        actor_role = await self.db.get(UserRole, actor.role_id)
+        target_role = await self.db.get(UserRole, user.role_id)
+
+        if actor.id != user_id:
+            if actor_role.order < target_role.order:
+                raise HTTPException(status_code=403, detail="insufficient_permissions")
+
+        if len(new_password) < 8:
+            raise HTTPException(status_code=400, detail="password_too_short")
+
+        hashed_password = get_hashed_password(new_password)
+        user.hashed_password = hashed_password
+        user.temp_token = uuid.uuid4()
+        await self.db.commit()
+
+        return {"user_id": user.id, "new_password": new_password}

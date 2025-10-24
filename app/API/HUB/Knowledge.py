@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.Infrastructure.Database import getdb
-from app.Services.Hub.AuthService.depends import getuser
+from app.Services.Hub.AuthService.depends import getuser, getuser_check_me
 from app.Objects.UserModel import User
 from app.Services.Hub.KnowledgeService import KnowledgeService
 
@@ -24,7 +24,7 @@ async def get_knowledge_tree(
 async def get_document(
     doc_id: str,
     db: AsyncSession = Depends(getdb),
-    user: User = Depends(getuser),
+    user: User = Depends(getuser_check_me),
 ):
     service = KnowledgeService(db)
     doc = await service.get_document(doc_id)

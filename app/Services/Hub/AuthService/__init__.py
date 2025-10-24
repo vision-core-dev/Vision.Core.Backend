@@ -1,5 +1,7 @@
 import uuid
+from datetime import datetime
 
+import pytz
 from fastapi import HTTPException
 from pydantic import EmailStr
 from sqlalchemy import select, func
@@ -101,3 +103,21 @@ class AuthService:
         await self.db.refresh(new_user)
 
         return RegisterUserResponse(user_id=new_user.id, email=email, password=password)
+
+    async def AcceptOffer(self, user: User) -> None:
+        if not user:
+            raise HTTPException(status_code=400, detail="user_not_found")
+
+        if not user.is_need_accept_terms:
+            raise HTTPException(status_code=400, detail="terms_already_accepted")
+
+        if user.is_terms_accepted:
+            raise HTTPException(status_code=400, detail="terms_already_accepted")
+
+        kyiv_tz = pytz.timezone("Europe/Kyiv")
+
+        user.is_terms_accepted = True
+        user.terms_accepted_at = datetime.now(kyiv_tz)
+
+        await self.db.commit()
+        await self.db.refresh(user)

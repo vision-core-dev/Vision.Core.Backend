@@ -17,3 +17,8 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(getdb)):
 @auth_router.get("/CheckMe", response_model=CheckMeResponse, dependencies=[Depends(HTTPBearer(auto_error=False))])
 async def me(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
     return await AuthService(db).CheckMe(user)
+
+
+@auth_router.post("/AcceptOffer")
+async def accept_offer(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    return await AuthService(db).AcceptOffer(user)

@@ -57,16 +57,16 @@ async def _get_user_by_token(
     result = await db.execute(q)
     user = result.scalar_one_or_none()
 
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="user_is_deactivated",
-        )
-
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="user_not_found",
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="user_is_deactivated",
         )
 
     _ = user.role.order

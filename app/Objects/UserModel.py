@@ -31,6 +31,10 @@ class User(Base):
     is_active = Column(Boolean, nullable=False, server_default=sql.expression.true())
     is_balance_visible = Column(Boolean, nullable=False, server_default=sql.expression.false())
 
+    is_need_accept_terms = Column(Boolean, nullable=False, server_default=sql.expression.true())
+    is_terms_accepted = Column(Boolean, nullable=False, server_default=sql.expression.false())
+    terms_accepted_at = Column(DateTime(timezone=True), nullable=True)
+
     # ✅ Додаємо ForeignKey до UserRoles.id
     role_id = Column(UUID(as_uuid=True), ForeignKey("UserRoles.id", ondelete="SET NULL"), nullable=True)
     role = relationship("UserRole", backref=backref("users", lazy="selectin"))
@@ -131,3 +135,6 @@ class MeUserBase(PydModel):
     avatar_url: Optional[str]
     is_balance_visible: bool
     balance: float
+    is_need_accept_terms: bool
+    is_terms_accepted: bool
+    terms_accepted_at: Optional[datetime]

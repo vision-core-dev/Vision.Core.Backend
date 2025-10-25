@@ -2,8 +2,8 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, UUID, String, ForeignKey, func, DateTime, Text, Boolean
-from sqlalchemy.dialects.postgresql import ENUM
+from sqlalchemy import Column, UUID, String, ForeignKey, func, DateTime, Text, Boolean, JSON
+from sqlalchemy.dialects.postgresql import ENUM, ARRAY
 from sqlalchemy.orm import relationship
 
 from app.Infrastructure.Database import Base, PydModel
@@ -24,6 +24,8 @@ class Board(Base):
     description = Column(Text, nullable=True)
     banner_url = Column(Text, nullable=True)
 
+    members = Column(JSON, nullable=False, default=dict)
+
     created_by_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"))
 
     is_removed = Column(Boolean, default=False, server_default="false")
@@ -31,23 +33,13 @@ class Board(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    # many-to-many
-    members = relationship(User, secondary="BoardMembers", back_populates="boards")
-
-
-class BoardMember(Base):
-    __tablename__ = "BoardMembers"
-
-    board_id = Column(UUID(as_uuid=True), ForeignKey("Boards.id"), primary_key=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"), primary_key=True)
-    role = Column(ENUM(BoardRole), default=BoardRole.MEMBER)
-
 
 class BoardBase(PydModel):
     id: uuid.UUID
     name: str
     description: str | None
     banner_url: str | None
+    members: dict | None = {}
     created_at: datetime | None
 
 # ✅ Pydantic-схема для відповіді

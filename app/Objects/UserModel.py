@@ -55,13 +55,6 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), default=datetime.now(), onupdate=datetime.now())
 
-    boards = relationship(
-        "Board",
-        secondary="BoardMembers",
-        back_populates="members"
-    )
-    # assigned_tasks = relationship("TaskAssignee", back_populates="user", cascade="all, delete-orphan")
-
 
 
 class UserRole(Base):

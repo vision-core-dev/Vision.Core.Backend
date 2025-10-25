@@ -4,6 +4,7 @@ from datetime import datetime
 from fastapi import HTTPException, UploadFile
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.Infrastructure.Storage import _upload_to_bunny, _delete_from_bunny
 from app.Objects.UserModel import User, UserPreview
@@ -22,16 +23,26 @@ class BoardService:
         new_board = Board(
             name=name,
             description=description,
-            created_by_id=user.id
+            created_by_id=user.id,
+            members={str(user.id): "admin"}
         )
         self.db.add(new_board)
         await self.db.commit()
         await self.db.refresh(new_board)
         return CreateBoardResponse(board_id=new_board.id)
 
-    async def GetBoardsList(self) -> BoardsListResponse:
-        result = await self.db.execute(select(Board).where(Board.is_removed == False))
+    async def GetBoardsList(self, actor: User) -> BoardsListResponse:
+        result = await self.db.execute(
+            select(Board).where(Board.is_removed == False)
+        )
         boards = result.scalars().all()
+
+        # 🧠 Фільтруємо дошки, де користувач є учасником або власником
+        visible_boards = []
+        for b in boards:
+            members = b.members or {}
+            if str(actor.id) in members or str(actor.id) == str(b.created_by_id):
+                visible_boards.append(b)
 
         previews = [
             {
@@ -40,10 +51,10 @@ class BoardService:
                 "description": b.description,
                 "created_at": b.created_at,
             }
-            for b in boards
+            for b in visible_boards
         ]
 
-        return BoardsListResponse(total=len(boards), list=previews)
+        return BoardsListResponse(total=len(previews), list=previews)
 
 
     async def GetBoardDetails(self, board_id, user: User) -> BoardDetailsResponse:
@@ -262,3 +273,82 @@ class BoardService:
             "priority": task.priority,
             "deadline_at": task.deadline_at,
         }
+
+    async def _check_board_admin(self, board: Board, actor: User):
+        """✅ Перевіряє, чи actor є адміном на дошці."""
+        # if not board.members:
+        #     raise HTTPException(status_code=404, detail="no_members_defined")
+        membs = board.members or {}
+
+        role = membs.get(str(actor.id))
+        if role != "admin" and str(actor.id) != str(board.created_by_id):
+            raise HTTPException(
+                status_code=403,
+                detail="permission_denied_not_admin"
+            )
+
+    async def AddBoardMember(self, board_id: uuid.UUID, user_id: uuid.UUID, actor: User, role: str = "member"):
+        board = await self.db.get(Board, board_id)
+        if not board:
+            raise HTTPException(status_code=404, detail="board_not_found")
+
+        # 🧠 Перевірка прав
+        await self._check_board_admin(board, actor)
+
+        user = await self.db.get(User, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="user_not_found")
+
+        print(board.members, user_id, role)
+
+        new_members = board.members or {}
+
+        if str(user_id) in new_members:
+            raise HTTPException(status_code=400, detail="member_already_exists")
+
+        new_members[str(user_id)] = role
+        board.members = new_members
+        flag_modified(board, "members")
+
+        await self.db.commit()
+        await self.db.refresh(board)
+        return {"ok": True, "role": role}
+
+    async def RemoveBoardMember(self, board_id: uuid.UUID, user_id: uuid.UUID, actor: User):
+        board = await self.db.get(Board, board_id)
+        if not board:
+            raise HTTPException(status_code=404, detail="board_not_found")
+
+        # 🧠 Перевірка прав
+        await self._check_board_admin(board, actor)
+
+        new_members = board.members or {}
+        if str(user_id) in new_members:
+            del new_members[str(user_id)]
+            board.members = new_members
+            flag_modified(board, "members")
+
+            await self.db.commit()
+            await self.db.refresh(board)
+
+        return {"ok": True}
+
+    async def ChangeMemberRole(self, board_id: uuid.UUID, user_id: uuid.UUID, new_role: str, actor: User):
+        board = await self.db.get(Board, board_id)
+        if not board:
+            raise HTTPException(status_code=404, detail="board_not_found")
+
+        # 🧠 Перевірка прав
+        await self._check_board_admin(board, actor)
+
+        new_members = board.members or {}
+        if str(user_id) not in new_members:
+            raise HTTPException(status_code=404, detail="member_not_found")
+
+        new_members[str(user_id)] = new_role
+        board.members = new_members
+        flag_modified(board, "members")
+
+        await self.db.commit()
+        await self.db.refresh(board)
+        return {"ok": True, "role": new_role}

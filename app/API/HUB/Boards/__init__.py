@@ -16,7 +16,7 @@ boards_router.include_router(task_router, prefix="/{board_id}")
 
 @boards_router.get("/List", response_model=BoardsListResponse)
 async def boards_list(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
-    return await BoardService(db).GetBoardsList()
+    return await BoardService(db).GetBoardsList(user)
 
 @boards_router.post("/Create", response_model=CreateBoardResponse)
 async def create_board(data: CreateBoardRequest, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
@@ -94,3 +94,6 @@ async def set_board_banner(
     """
     return await BoardService(db).SetBoardBanner(board_id, data.get("banner_url"), user)
 
+
+from .members import board_members_router
+boards_router.include_router(board_members_router)

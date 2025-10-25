@@ -121,10 +121,12 @@ class BoardService:
             tags=tags
         )
 
-    async def CreateTag(self, board_id: uuid.UUID, name: str, color: str):
+    async def CreateTag(self, board_id: uuid.UUID, name: str, color: str, actor: User):
         board = await self.db.get(Board, board_id)
         if not board:
             raise HTTPException(status_code=404, detail="board_not_found")
+
+        await self._check_board_admin(board, actor)
 
         new_tag = TaskTag(
             name=name,
@@ -136,7 +138,13 @@ class BoardService:
         await self.db.refresh(new_tag)
         return {"ok": True, "id": new_tag.id}
 
-    async def RemoveTag(self, board_id: uuid.UUID, tag_id: uuid.UUID):
+    async def RemoveTag(self, board_id: uuid.UUID, tag_id: uuid.UUID, actor: User):
+        board = await self.db.get(Board, board_id)
+        if not board:
+            raise HTTPException(status_code=404, detail="board_not_found")
+
+        await self._check_board_admin(board, actor)
+
         tag = await self.db.get(TaskTag, tag_id)
         if not tag or getattr(tag, "board_id", None) != board_id:
             raise HTTPException(status_code=404, detail="tag_not_found")
@@ -144,12 +152,13 @@ class BoardService:
         await self.db.commit()
         return {"ok": True}
 
-        # --- Списки ---
 
-    async def CreateList(self, board_id: uuid.UUID, name: str, color: str):
+    async def CreateList(self, board_id: uuid.UUID, name: str, color: str, actor: User):
         board = await self.db.get(Board, board_id)
         if not board:
             raise HTTPException(status_code=404, detail="board_not_found")
+
+        await self._check_board_admin(board, actor)
 
         max_order_query = await self.db.execute(
             select(BoardList.order).where(BoardList.board_id == board_id)
@@ -167,7 +176,13 @@ class BoardService:
         await self.db.refresh(new_list)
         return {"ok": True, "id": new_list.id}
 
-    async def RemoveList(self, board_id: uuid.UUID, list_id: uuid.UUID):
+    async def RemoveList(self, board_id: uuid.UUID, list_id: uuid.UUID, actor: User):
+        board = await self.db.get(Board, board_id)
+        if not board:
+            raise HTTPException(status_code=404, detail="board_not_found")
+
+        await self._check_board_admin(board, actor)
+
         lst = await self.db.get(BoardList, list_id)
         if not lst or lst.board_id != board_id:
             raise HTTPException(status_code=404, detail="list_not_found")
@@ -175,10 +190,12 @@ class BoardService:
         await self.db.commit()
         return {"ok": True}
 
-    async def SetBoardBanner(self, board_id: uuid.UUID, banner_url: str, user: User):
+    async def SetBoardBanner(self, board_id: uuid.UUID, banner_url: str, actor: User):
         board = await self.db.get(Board, board_id)
         if not board:
             raise HTTPException(status_code=404, detail="board_not_found")
+
+        await self._check_board_admin(board, actor)
 
         # Оновлюємо банер
         board.banner_url = banner_url
@@ -187,10 +204,12 @@ class BoardService:
 
         return {"ok": True, "banner_url": board.banner_url}
 
-    async def UploadBannerFile(self, board_id: uuid.UUID, file: UploadFile, user: User) -> str:
+    async def UploadBannerFile(self, board_id: uuid.UUID, file: UploadFile, actor: User) -> str:
         board = await self.db.get(Board, board_id)
         if not board:
             raise HTTPException(status_code=404, detail="board_not_found")
+
+        await self._check_board_admin(board, actor)
 
         # читаємо файл із UploadFile
         contents = await file.read()

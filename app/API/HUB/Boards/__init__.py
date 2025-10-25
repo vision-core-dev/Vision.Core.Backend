@@ -36,7 +36,7 @@ async def create_tag(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
-    return await BoardService(db).CreateTag(board_id, data["name"], data["color"])
+    return await BoardService(db).CreateTag(board_id, data["name"], data["color"], user)
 
 
 @boards_router.post("/{board_id}/Tags/{tag_id}/Remove")
@@ -46,7 +46,7 @@ async def remove_tag(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
-    return await BoardService(db).RemoveTag(board_id, tag_id)
+    return await BoardService(db).RemoveTag(board_id, tag_id, user)
 
 
 # --- Lists ---
@@ -57,7 +57,7 @@ async def create_list(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
-    return await BoardService(db).CreateList(board_id, data["name"], data["color"])
+    return await BoardService(db).CreateList(board_id, data["name"], data["color"], user)
 
 
 @boards_router.post("/{board_id}/Lists/{list_id}/Remove")
@@ -67,7 +67,7 @@ async def remove_list(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
-    return await BoardService(db).RemoveList(board_id, list_id)
+    return await BoardService(db).RemoveList(board_id, list_id, user)
 
 
 @boards_router.post("/{board_id}/UploadBanner")
@@ -83,7 +83,7 @@ async def upload_banner(
     return {"ok": True, "banner_url": url}
 
 @boards_router.post("/{board_id}/SetBanner")
-async def set_board_banner(
+async def set_board_banner( 
     board_id: uuid.UUID,
     data: dict = Body(...),
     user: User = Depends(getuser),

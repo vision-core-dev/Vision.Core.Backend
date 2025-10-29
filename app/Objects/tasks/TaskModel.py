@@ -6,7 +6,8 @@ from sqlalchemy import Column, UUID, ForeignKey, DateTime, Boolean, Numeric, Str
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM
 from sqlalchemy.orm import relationship
 
-from app.Infrastructure.Database import Base, PydModel
+from app.Infrastructure.Database import Base, PydModel, getdb
+from app.Objects.tasks.SubtaskModel import Subtask
 
 
 class TaskStatus(enum.Enum):
@@ -24,7 +25,6 @@ class Task(Base):
     __tablename__ = "Tasks"
 
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
-    parent_task_id = Column(UUID(as_uuid=True), ForeignKey("Tasks.id"), nullable=True)
 
     board_id = Column(UUID(as_uuid=True), ForeignKey("Boards.id", ondelete="SET NULL"), nullable=True)
     list_id = Column(UUID(as_uuid=True), ForeignKey("BoardLists.id", ondelete="SET NULL"), nullable=True)
@@ -60,6 +60,24 @@ class Task(Base):
     list = relationship("BoardList", backref="Tasks")
     created_by = relationship("User", foreign_keys=[created_by_id])
     attachments = relationship("TaskAttachment", back_populates="task", cascade="all, delete-orphan", foreign_keys="[TaskAttachment.task_id]")
+
+    subtasks = relationship(
+        "Subtask",
+        back_populates="task",
+        cascade="all, delete-orphan",
+        foreign_keys="[Subtask.task_id]"
+    )
+
+    async def add_subtask(self, name: str):
+        async with getdb() as session:
+            subtask = Subtask(
+                task_id=self.id,
+                name=name,
+            )
+            session.add(subtask)
+            await session.commit()
+            await session.refresh(subtask)
+            return subtask
 
 
 class TaskPreview(PydModel):

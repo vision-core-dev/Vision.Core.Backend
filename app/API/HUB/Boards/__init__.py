@@ -83,7 +83,7 @@ async def upload_banner(
     return {"ok": True, "banner_url": url}
 
 @boards_router.post("/{board_id}/SetBanner")
-async def set_board_banner( 
+async def set_board_banner(
     board_id: uuid.UUID,
     data: dict = Body(...),
     user: User = Depends(getuser),

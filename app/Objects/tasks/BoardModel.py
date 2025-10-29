@@ -3,11 +3,8 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Column, UUID, String, ForeignKey, func, DateTime, Text, Boolean, JSON
-from sqlalchemy.dialects.postgresql import ENUM, ARRAY
-from sqlalchemy.orm import relationship
 
 from app.Infrastructure.Database import Base, PydModel
-from app.Objects.UserModel import User
 
 
 class BoardRole(enum.Enum):
@@ -24,7 +21,7 @@ class Board(Base):
     description = Column(Text, nullable=True)
     banner_url = Column(Text, nullable=True)
 
-    members = Column(JSON, nullable=False, default=dict)
+    members = Column(JSON, nullable=False, default=dict, server_default="{}")
 
     created_by_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"))
 

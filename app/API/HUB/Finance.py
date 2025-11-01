@@ -16,7 +16,7 @@ finance_router = APIRouter(prefix="/Finance", tags=["Hub > Finance"])
 @finance_router.get("/GetSalaryInfo")
 async def get_salary_info(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
     # 🧮 Баланс користувача
-    current_balance = user.b    alance or 0.0
+    current_balance = user.balance or 0.0
     withdrawn_amount = user.withdrawn_amount or 0.0
 
     # 💰 Трансакції

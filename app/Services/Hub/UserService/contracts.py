@@ -5,6 +5,7 @@ from pydantic import BaseModel, EmailStr
 
 from app.Objects.BadgeModel import UserBadgeBase
 from app.Objects.UserModel import UserBase, UserPreview
+from app.Objects.finance.TransactionModel import TransactionBase
 
 
 class UsersListResponse(BaseModel):
@@ -31,7 +32,7 @@ class UserDetailsResponse(BaseModel):
     supervisors: list[UserPreview] = []
     subordinates: list[UserPreview] = []
     badges: list[UserBadgeBase] = []
-    transactions: list[dict] = []
+    transactions: list[TransactionBase] = []
 
     class Config:
         from_attributes = True

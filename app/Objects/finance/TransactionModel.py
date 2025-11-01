@@ -1,7 +1,10 @@
 import enum
+import uuid
+from datetime import datetime
+
 from sqlalchemy import Column, Text, UUID, func, DateTime, Boolean, ForeignKey, String, Float
 from sqlalchemy.dialects.postgresql import ENUM
-from app.Infrastructure.Database import Base
+from app.Infrastructure.Database import Base, PydModel
 
 
 class TransactionType(enum.Enum):
@@ -38,3 +41,11 @@ class Transaction(Base):
     transaction_at = Column(DateTime(timezone=True), server_default=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class TransactionBase(PydModel):
+    id: uuid.UUID
+    name: str
+    type: TransactionType
+    amount: float
+    transaction_at: datetime

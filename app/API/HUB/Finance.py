@@ -1,3 +1,4 @@
+import math
 import uuid
 from datetime import datetime
 
@@ -244,7 +245,7 @@ async def create_transaction(
         # Оновлюємо баланс
         target_user.balance = (target_user.balance or 0.0) + float(data.amount)
         if data.type == TransactionType.WITHDRAWAL:
-            user.withdrawn_amount = (user.withdrawn_amount or 0.0) + data.amount
+            user.withdrawn_amount = (user.withdrawn_amount or 0.0) + (-data.amount)
         db.add(target_user)
 
     # Один комміт для всіх

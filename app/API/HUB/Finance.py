@@ -111,4 +111,4 @@ def _map_withdraw_status(db_status: str) -> str:
     return mapping.get(db_status, "pending")
 
 
-@finance_router.get("/GetFinanceStats")
+# @finance_router.get("/GetFinanceStats")

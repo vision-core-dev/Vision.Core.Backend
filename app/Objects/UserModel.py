@@ -4,7 +4,8 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel
-from sqlalchemy import Column, String, DateTime, UUID, func, ARRAY, ForeignKey, Boolean, sql, Numeric, Integer, TEXT
+from sqlalchemy import Column, String, DateTime, UUID, func, ARRAY, ForeignKey, Boolean, sql, Numeric, Integer, TEXT, \
+    Float
 from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.orm import relationship, backref
 
@@ -16,6 +17,12 @@ class Currency(enum.Enum):
     USD = "USD"
     EUR = "EUR"
 
+class PaymentMethod(enum.Enum):
+    STEAM_GAME = "steam_game"
+    BANK_TRANSFER = "bank_transfer"
+    ROBUX = "robux"
+    PAYPAL = "paypal"
+
 class User(Base):
     __tablename__ = "Users"
 
@@ -25,8 +32,8 @@ class User(Base):
     email = Column(String(100), unique=True, nullable=True)
     hashed_password = Column(String(255), nullable=True)
 
-    balance = Column(Numeric(10, 2), nullable=False, default=0.00)
-    withdrawn_amount = Column(Numeric(10, 2), nullable=False, default=0.00, server_default="0.00")
+    balance = Column(Float, nullable=False, default=0.00)
+    withdrawn_amount = Column(Float, nullable=False, default=0.00, server_default="0.00")
     currency = Column(ENUM(Currency), nullable=False, server_default="UAH")
 
     is_active = Column(Boolean, nullable=False, server_default=sql.expression.true())

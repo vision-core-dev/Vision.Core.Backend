@@ -1,12 +1,14 @@
+import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.Infrastructure.Database import getdb
 from app.Objects.UserModel import User
-from app.Objects.finance.TransactionModel import Transaction
+from app.Objects.finance.TransactionModel import Transaction, TransactionType
 from app.Objects.finance.WithdrawalLimitModel import WithdrawalLimitModel
 from app.Objects.finance.WithdrawalRequestModel import WithdrawalRequest, WithdrawalRequestStatus
 from app.Services.Hub.AuthService.depends import getuser
@@ -29,9 +31,9 @@ async def get_salary_info(user: User = Depends(getuser), db: AsyncSession = Depe
         {
             "id": str(t.id),
             "name": t.name,
-            "type": _map_transaction_type(t.type),
+            "type": t.type.value,
             "amount": float(t.amount),
-            "created_at": t.created_at.isoformat(),
+            "transaction_at": t.transaction_at.isoformat(),
         }
         for t in transactions_result.scalars().all()
     ]
@@ -45,7 +47,7 @@ async def get_salary_info(user: User = Depends(getuser), db: AsyncSession = Depe
     )
     limit = limit_result.scalar_one_or_none()
 
-    monthly_limit = float(limit.limit_amount) if limit else 10000.0
+    monthly_limit = float(limit.limit_amount) if limit else 0.00
 
     # Розрахунок залишку ліміту
     withdraw_sum_result = await db.execute(
@@ -53,7 +55,7 @@ async def get_salary_info(user: User = Depends(getuser), db: AsyncSession = Depe
         .where(
             WithdrawalRequest.user_id == user.id,
             WithdrawalRequest.status.in_(
-                [WithdrawalRequestStatus.PAID.value, WithdrawalRequestStatus.APPROVED.value]
+                [WithdrawalRequestStatus.PAID, WithdrawalRequestStatus.APPROVED]
             ),
             func.date_trunc("month", WithdrawalRequest.requested_at)
             == func.date_trunc("month", datetime.utcnow())
@@ -68,16 +70,17 @@ async def get_salary_info(user: User = Depends(getuser), db: AsyncSession = Depe
         .where(WithdrawalRequest.user_id == user.id)
         .order_by(WithdrawalRequest.requested_at.desc())
     )
-    withdrawal_requests = [
-        {
+    withdrawal_requests = []
+    for r in requests_result.scalars().all():
+        status_value = getattr(r, "status", "pending")
+        withdrawal_requests.append({
             "id": str(r.id),
             "amount": float(r.amount),
-            "status": _map_withdraw_status(r.status),
-            "reason": getattr(r, "description", None),
+            "status": status_value,
+            "comment": r.comment,
+            "reason": r.reason,
             "created_at": r.requested_at.isoformat(),
-        }
-        for r in requests_result.scalars().all()
-    ]
+        })
 
     # 📦 Формуємо фінальну відповідь
     return {
@@ -89,26 +92,161 @@ async def get_salary_info(user: User = Depends(getuser), db: AsyncSession = Depe
     }
 
 
-# 🔧 Мапінги типів для фронту
-def _map_transaction_type(db_type: str) -> str:
-    mapping = {
-        "income": "credit",
-        "withdrawal": "withdraw",
-        "deduction": "deduction",
-        "expense": "deduction",
-    }
-    return mapping.get(db_type, "credit")
 
 
-def _map_withdraw_status(db_status: str) -> str:
-    mapping = {
-        "pending": "pending",
-        "approved": "approved",
-        "rejected": "rejected",
-        "paid": "paid",
-        "completed": "paid",
+class WithdrawalRequestDataModel(BaseModel):
+    amount: float
+    comment: str | None = None
+
+@finance_router.post("/CreateWithdrawalRequest")
+async def create_withdrawal_request(
+    data: WithdrawalRequestDataModel,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    if data.amount <= 0:
+        raise HTTPException(status_code=400, detail="invalid_amount")
+
+    # 🔹 Поточний баланс користувача
+    current_balance = user.balance or 0.0
+    if data.amount > current_balance:
+        raise HTTPException(status_code=400, detail="amount_exceeds_balance")
+
+    # 🔹 Отримуємо ліміт
+    limit_result = await db.execute(
+        select(WithdrawalLimitModel)
+        .where(WithdrawalLimitModel.user_id == user.id)
+        .order_by(WithdrawalLimitModel.created_at.desc())
+        .limit(1)
+    )
+    limit = limit_result.scalar_one_or_none()
+    monthly_limit = float(limit.limit_amount) if limit else 10000.0
+
+    # 🔹 Обчислюємо вже використаний ліміт цього місяця
+    withdraw_sum_result = await db.execute(
+        select(func.sum(WithdrawalRequest.amount))
+        .where(
+            WithdrawalRequest.user_id == user.id,
+            WithdrawalRequest.status.in_(
+                [WithdrawalRequestStatus.PAID, WithdrawalRequestStatus.APPROVED]
+            ),
+            func.date_trunc("month", WithdrawalRequest.requested_at)
+            == func.date_trunc("month", datetime.utcnow())
+        )
+    )
+    used_withdraw = withdraw_sum_result.scalar() or 0.0
+    remaining_limit = monthly_limit - used_withdraw
+
+    if data.amount > remaining_limit:
+        raise HTTPException(status_code=400, detail="amount_exceeds_monthly_limit")
+
+    # 🧾 Створюємо новий запит
+    new_request = WithdrawalRequest(
+        user_id=user.id,
+        amount=data.amount,
+        comment=data.comment,
+        status=WithdrawalRequestStatus.PENDING,
+        requested_at=datetime.utcnow(),
+    )
+
+    db.add(new_request)
+    await db.commit()
+    await db.refresh(new_request)
+
+    # 🧮 Оновлюємо баланс користувача
+    user.balance = current_balance - data.amount
+    await db.commit()
+
+    return {
+        "id": str(new_request.id),
+        "status": "pending",
+        "amount": data.amount,
+        "requested_at": new_request.requested_at.isoformat(),
+        "message": "withdrawal_request_created",
     }
-    return mapping.get(db_status, "pending")
 
 
 # @finance_router.get("/GetFinanceStats")
+
+def _map_transaction_type(db_type: str) -> str:
+    mapping = { "income": "credit", "withdrawal": "withdraw", "deduction": "deduction", "expense": "deduction", }
+    return mapping.get(db_type, "credit")
+
+@finance_router.get("/GetTransactionsList")
+async def get_transactions_list(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    transactions_result = await db.execute(
+        select(Transaction)
+        .where(Transaction.is_removed == False)
+        .order_by(Transaction.created_at.desc())
+    )
+    transactions = [
+        {
+            "id": str(t.id),
+            "user_id": str(t.user_id),
+            "name": t.name,
+            "type": _map_transaction_type(t.type),
+            "amount": float(t.amount),
+            "transaction_at": t.transaction_at.isoformat(),
+        }
+        for t in transactions_result.scalars().all()
+    ]
+
+    users_result = await db.execute(select(User))
+    users = [
+        {
+            "id": str(u.id),
+            "avatar_url": u.avatar_url,
+            "first_name": u.first_name,
+            "last_name": u.last_name,
+        }
+        for u in users_result.scalars().all()
+    ]
+
+    return {"transactions": transactions, "users": users}
+
+
+class CreateTransactionDataModel(BaseModel):
+    name: str
+    type: TransactionType
+    amount: float | int
+    users: list[uuid.UUID] | None = []
+
+@finance_router.post("/CreateTransaction")
+async def create_transaction(
+    data: CreateTransactionDataModel,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    ids = []
+
+    for user_id in data.users or []:
+        target_user_res = await db.execute(select(User).where(User.id == user_id))
+        target_user = target_user_res.scalar_one_or_none()
+        if not target_user:
+            continue
+
+        shared_transaction = Transaction(
+            user_id=target_user.id,
+            name=data.name,
+            type=data.type,
+            amount=float(data.amount),
+            transaction_at=datetime.utcnow(),
+            is_removed=False,
+        )
+        db.add(shared_transaction)
+
+        # 🔹 Форсуємо flush — отримуємо id з бази до комміту
+        await db.flush()
+        ids.append(str(shared_transaction.id))
+
+        # Оновлюємо баланс
+        target_user.balance = (target_user.balance or 0.0) + float(data.amount)
+        db.add(target_user)
+
+    # Один комміт для всіх
+    await db.commit()
+
+    return {
+        "ids": ids,
+        "message": "transaction_created",
+    }

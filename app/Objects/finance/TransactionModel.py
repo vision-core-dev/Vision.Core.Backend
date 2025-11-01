@@ -1,7 +1,6 @@
 import enum
-
-from sqlalchemy import Column, Text, UUID, func, DateTime, Boolean, ForeignKey, String
-
+from sqlalchemy import Column, Text, UUID, func, DateTime, Boolean, ForeignKey, String, Float
+from sqlalchemy.dialects.postgresql import ENUM
 from app.Infrastructure.Database import Base
 
 
@@ -9,8 +8,16 @@ class TransactionType(enum.Enum):
     INCOME = "income"
     EXPENSE = "expense"
     TRANSFER = "transfer"
-    withdrawal = "withdrawal"
-    deduction = "deduction"
+    WITHDRAWAL = "withdrawal"
+    DEDUCTION = "deduction"
+
+
+# ✅ Оголошуємо ENUM тип для PostgreSQL
+TransactionTypeEnum = ENUM(
+    TransactionType,
+    name="transactiontype",     # ім’я типу в PostgreSQL
+    create_type=True            # створює тип, якщо його ще немає
+)
 
 
 class Transaction(Base):
@@ -19,13 +26,15 @@ class Transaction(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
 
     name = Column(Text, nullable=True)
-    type = Column(String(50), nullable=False)
-    amount = Column(String(50), nullable=False)
+    type = Column(TransactionTypeEnum, nullable=False)
+    amount = Column(Float, nullable=False)
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"))
     created_by_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"))
 
+    is_future = Column(Boolean, default=False, server_default="false")
     is_removed = Column(Boolean, default=False, server_default="false")
 
+    transaction_at = Column(DateTime(timezone=True), server_default=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -210,6 +210,7 @@ class CreateTransactionDataModel(BaseModel):
     type: TransactionType
     amount: float | int
     users: list[uuid.UUID] | None = []
+    transaction_at: datetime | None = None
 
 @finance_router.post("/CreateTransaction")
 async def create_transaction(
@@ -218,6 +219,7 @@ async def create_transaction(
     db: AsyncSession = Depends(getdb)
 ):
     ids = []
+    tx_time = data.transaction_at or datetime.utcnow()
 
     for user_id in data.users or []:
         target_user_res = await db.execute(select(User).where(User.id == user_id))
@@ -230,7 +232,7 @@ async def create_transaction(
             name=data.name,
             type=data.type,
             amount=float(data.amount),
-            transaction_at=datetime.utcnow(),
+            transaction_at=tx_time,
             is_removed=False,
         )
         db.add(shared_transaction)
@@ -249,4 +251,72 @@ async def create_transaction(
     return {
         "ids": ids,
         "message": "transaction_created",
+    }
+
+@finance_router.post("/ApproveWithdrawalRequest")
+async def approve_withdrawal_request(
+    data: dict,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    request_id = data.get("request_id")
+    if not request_id:
+        raise HTTPException(status_code=400, detail="request_id_required")
+
+    request_res = await db.execute(
+        select(WithdrawalRequest).where(WithdrawalRequest.id == request_id)
+    )
+    request = request_res.scalar_one_or_none()
+    if not request:
+        raise HTTPException(status_code=404, detail="withdrawal_request_not_found")
+
+    if request.status != WithdrawalRequestStatus.PENDING:
+        raise HTTPException(status_code=400, detail="withdrawal_request_not_pending")
+
+    request.status = WithdrawalRequestStatus.APPROVED
+    await db.commit()
+
+    return {
+        "id": str(request.id),
+        "status": "approved",
+        "message": "withdrawal_request_approved",
+    }
+
+@finance_router.post("/RejectWithdrawalRequest")
+async def reject_withdrawal_request(
+    data: dict,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    request_id = data.get("request_id")
+    reason = data.get("reason", "No reason provided")
+    if not request_id:
+        raise HTTPException(status_code=400, detail="request_id_required")
+
+    request_res = await db.execute(
+        select(WithdrawalRequest).where(WithdrawalRequest.id == request_id)
+    )
+    request = request_res.scalar_one_or_none()
+    if not request:
+        raise HTTPException(status_code=404, detail="withdrawal_request_not_found")
+
+    if request.status != WithdrawalRequestStatus.PENDING:
+        raise HTTPException(status_code=400, detail="withdrawal_request_not_pending")
+
+    request.status = WithdrawalRequestStatus.REJECTED
+    request.reason = reason
+    await db.commit()
+
+    # Повертаємо кошти на баланс користувача
+    user_res = await db.execute(select(User).where(User.id == request.user_id))
+    target_user = user_res.scalar_one_or_none()
+    if target_user:
+        target_user.balance = (target_user.balance or 0.0) + float(request.amount)
+        db.add(target_user)
+        await db.commit()
+
+    return {
+        "id": str(request.id),
+        "status": "rejected",
+        "message": "withdrawal_request_rejected",
     }

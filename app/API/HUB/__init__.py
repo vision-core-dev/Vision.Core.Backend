@@ -28,3 +28,6 @@ hub_router.include_router(tasks_router)
 
 from .Uploads import upload_router
 hub_router.include_router(upload_router)
+
+from .Finance import finance_router
+hub_router.include_router(finance_router)

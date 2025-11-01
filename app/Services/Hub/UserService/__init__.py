@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload, joinedload
 
 from app.Objects.BadgeModel import UserBadge, Badge, UserBadgeBase
 from app.Objects.UserModel import User, UserRole
+from app.Objects.finance.TransactionModel import Transaction
 from app.Services.Hub.AuthService import AuthService, get_hashed_password
 from app.Services.Hub.UserService.contracts import (
     UsersListResponse,
@@ -91,12 +92,18 @@ class UserService:
             for ub in user_badges
         ]
 
+        transactions_result = await self.db.execute(
+            select(Transaction).where(Transaction.user_id == user.id, Transaction.is_removed == False)
+        )
+        transactions = transactions_result.scalars().all()
+
         return UserDetailsResponse(
             user=user,
             actions=actions,
             supervisors=supervisors,
             subordinates=subordinates,
-            badges=badges  # 👈 нове поле
+            badges=badges,
+            transactions=transactions
         )
 
     async def ChangeUserRole(self, user_id: uuid.UUID, new_role_id: uuid.UUID, actor: User) -> UserDetailsResponse:

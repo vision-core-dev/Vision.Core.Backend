@@ -31,6 +31,7 @@ class UserDetailsResponse(BaseModel):
     supervisors: list[UserPreview] = []
     subordinates: list[UserPreview] = []
     badges: list[UserBadgeBase] = []
+    transactions: list[dict] = []
 
     class Config:
         from_attributes = True

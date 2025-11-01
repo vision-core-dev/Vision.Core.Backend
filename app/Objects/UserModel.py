@@ -119,6 +119,8 @@ class UserBase(PydModel):
     email: str | None
     first_name: str | None
     last_name: str | None
+    balance: float
+    withdrawn_amount: float
     role: Optional[UserRoleBase] = None
     avatar_url: str | None
     birthday: datetime | None

@@ -26,6 +26,7 @@ class User(Base):
     hashed_password = Column(String(255), nullable=True)
 
     balance = Column(Numeric(10, 2), nullable=False, default=0.00)
+    withdrawn_amount = Column(Numeric(10, 2), nullable=False, default=0.00, server_default="0.00")
     currency = Column(ENUM(Currency), nullable=False, server_default="UAH")
 
     is_active = Column(Boolean, nullable=False, server_default=sql.expression.true())

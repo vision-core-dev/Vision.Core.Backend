@@ -222,9 +222,25 @@ class EventService:
         if not invite:
             raise HTTPException(status_code=404, detail="invite_not_found")
 
-        # 🇺🇦 Київський час
+        # 🧩 Отримуємо подію
+        event_result = await self.db.execute(
+            select(Event).where(Event.id == event_uuid)
+        )
+        event = event_result.scalar_one_or_none()
+        if not event:
+            raise HTTPException(status_code=404, detail="event_not_found")
+
+        # 🇺🇦 Поточний час у Києві
         kyiv_tz = pytz.timezone("Europe/Kyiv")
         now_kyiv = datetime.now(kyiv_tz)
+
+        # 🕓 Формуємо datetime початку події (дата + час)
+        event_start_dt = datetime.combine(event.date.date(), event.time_from)
+        event_start_dt = kyiv_tz.localize(event_start_dt)
+
+        # 🚫 Якщо подія ще не почалась — забороняємо відмітку присутності
+        if now_kyiv < event_start_dt:
+            raise HTTPException(status_code=400, detail="event_not_started")
 
         # 🧠 Оновлюємо статус
         if attended:

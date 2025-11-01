@@ -169,10 +169,6 @@ async def create_withdrawal_request(
 
 # @finance_router.get("/GetFinanceStats")
 
-def _map_transaction_type(db_type: str) -> str:
-    mapping = { "income": "credit", "withdrawal": "withdraw", "deduction": "deduction", "expense": "deduction", }
-    return mapping.get(db_type, "credit")
-
 @finance_router.get("/GetTransactionsList")
 async def get_transactions_list(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
     transactions_result = await db.execute(
@@ -185,7 +181,7 @@ async def get_transactions_list(user: User = Depends(getuser), db: AsyncSession 
             "id": str(t.id),
             "user_id": str(t.user_id),
             "name": t.name,
-            "type": _map_transaction_type(t.type),
+            "type": t.type.value,
             "amount": float(t.amount),
             "transaction_at": t.transaction_at.isoformat(),
         }

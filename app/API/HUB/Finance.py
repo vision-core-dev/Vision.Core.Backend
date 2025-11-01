@@ -155,6 +155,8 @@ async def create_withdrawal_request(
 
     # 🧮 Оновлюємо баланс користувача
     user.balance = current_balance - data.amount
+    if data.type == TransactionType.WITHDRAWAL:
+        user.withdrawn_amount = (user.withdrawn_amount or 0.0) + data.amount
     await db.commit()
 
     return {

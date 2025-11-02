@@ -2,6 +2,7 @@ import math
 import uuid
 from datetime import datetime
 
+import pytz
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select, func
@@ -216,7 +217,13 @@ async def create_transaction(
     db: AsyncSession = Depends(getdb)
 ):
     ids = []
-    tx_time = data.transaction_at or datetime.utcnow()
+    kyiv_tz = pytz.timezone("Europe/Kyiv")
+
+    tx_time = (
+        data.transaction_at.astimezone(kyiv_tz)
+        if data.transaction_at
+        else datetime.now(kyiv_tz)
+    )
 
     for user_id in data.users or []:
         target_user_res = await db.execute(select(User).where(User.id == user_id))

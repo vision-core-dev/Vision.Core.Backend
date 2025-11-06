@@ -65,7 +65,7 @@ class BoardService:
             raise HTTPException(status_code=404, detail="board_not_found")
 
         # 🟩 2. Отримуємо учасників (many-to-many)
-        users_query = (select(User).where(User.is_active == True))
+        users_query = (select(User))
         users_result = await self.db.execute(users_query)
         users = users_result.scalars().all()
 

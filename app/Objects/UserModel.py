@@ -112,6 +112,7 @@ class UserPreview(PydModel):
     avatar_url: str | None
     role: Optional[UserRolePreview] = None
     role_name: str | None = None
+    is_active: bool = False
     created_at: datetime | None = None
 
 class UserBase(PydModel):

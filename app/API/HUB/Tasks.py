@@ -158,3 +158,6 @@ async def update_dates(
         completed_at=completed_at,
         user=user
     )
+
+from .Subtasks import subtasks_router
+tasks_router.include_router(subtasks_router)

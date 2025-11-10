@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from typing import List, Optional
 import uuid
 
+from app.Objects.tasks.SubtaskModel import SubtaskBase
+
 
 class UserPreview(BaseModel):
     id: uuid.UUID
@@ -44,6 +46,7 @@ class TaskDetailsResponse(BaseModel):
     deadline_at: Optional[datetime]
     completed_at: Optional[datetime]
     attachments: List[AttachmentPreview]
+    subtasks: List[SubtaskBase]
     comments: List[CommentPreview]
     created_by: UserPreview
     created_at: datetime

@@ -6,6 +6,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
 from app.Infrastructure.Storage import _upload_to_bunny
+from app.Objects.tasks.SubtaskModel import Subtask, SubtaskBase
 from app.Objects.tasks.TaskAttachment import TaskAttachment, TaskComment
 from app.Objects.tasks.TaskModel import Task
 from app.Objects.tasks.TaskTags import TaskTag
@@ -67,6 +68,21 @@ class TaskService:
             for a in attachments_result.scalars().all()
         ]
 
+        # subtasks
+        q_subtasks = await self.db.execute(
+            select(Subtask).where(Subtask.task_id == task.id).order_by(Subtask.created_at)
+        )
+        subtasks = [
+            SubtaskBase(
+                id=s.id,
+                name=s.name,
+                status=s.status,
+                deadline_at=s.deadline_at,
+                assignee_id=s.assignee_id,
+            )
+            for s in q_subtasks.scalars().all()
+        ]
+
         # 🔹 6. Коментарі
         comments_result = await self.db.execute(
             select(TaskComment).where(TaskComment.task_id == task.id).order_by(TaskComment.created_at)
@@ -108,6 +124,7 @@ class TaskService:
             deadline_at=task.deadline_at,
             completed_at=task.completed_at,
             attachments=attachments,
+            subtasks=subtasks,
             comments=comments,
             created_by=UserPreview(
                 id=creator.id,
@@ -482,3 +499,80 @@ class TaskService:
             "started_at": task.started_at,
             "completed_at": task.completed_at,
         }
+
+    async def GetSubtasks(self, task_id, user):
+
+        # 🔍 Знаходимо задачу
+        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalar_one_or_none()
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        # 📋 Отримуємо підзадачі
+        result = await self.db.execute(
+            select(Subtask).where(Subtask.task_id == task_id).order_by(Subtask.created_at)
+        )
+        subtasks = result.scalars().all()
+        return subtasks
+
+    async def CreateSubtask(self, task_id, name, user):
+        # 🔍 Знаходимо задачу
+        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalar_one_or_none()
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        # ➕ Створюємо підзадачу
+        subtask = Subtask(
+            name=name,
+            task_id=task_id
+        )
+        self.db.add(subtask)
+        await self.db.commit()
+        await self.db.refresh(subtask)
+        return subtask
+
+    async def RenameSubtask(self, task_id, subtask_id, new_name, user):
+        # 🔍 Знаходимо підзадачу
+        subtask = await self.db.get(Subtask, subtask_id)
+        if not subtask or subtask.task_id != task_id:
+            raise HTTPException(status_code=404, detail="subtask_not_found")
+
+        # ✏️ Оновлюємо назву
+        subtask.name = new_name
+        await self.db.commit()
+
+        return {
+            "subtask_id": str(subtask.id),
+            "new_name": subtask.name
+        }
+
+    async def SetSubtaskCompleted(self, task_id, subtask_id, is_completed, user):
+        # 🔍 Знаходимо підзадачу
+        subtask = await self.db.get(Subtask, subtask_id)
+        if not subtask or subtask.task_id != task_id:
+            raise HTTPException(status_code=404, detail="subtask_not_found")
+
+        # ✅ Оновлюємо статус
+        subtask.status = "completed" if is_completed else "pending"
+        await self.db.commit()
+
+        return {
+            "subtask_id": str(subtask.id),
+            "status": subtask.status
+        }
+
+    async def DeleteSubtask(self, task_id, subtask_id, user):
+        # 🔍 Знаходимо підзадачу
+        subtask = await self.db.get(Subtask, subtask_id)
+        if not subtask or subtask.task_id != task_id:
+            raise HTTPException(status_code=404, detail="subtask_not_found")
+
+        # ❌ Видаляємо підзадачу
+        await self.db.delete(subtask)
+        await self.db.commit()
+
+        return {
+            "subtask_id": str(subtask.id)
+        }
+

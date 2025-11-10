@@ -68,17 +68,6 @@ class Task(Base):
         foreign_keys="[Subtask.task_id]"
     )
 
-    async def add_subtask(self, name: str):
-        async with getdb() as session:
-            subtask = Subtask(
-                task_id=self.id,
-                name=name,
-            )
-            session.add(subtask)
-            await session.commit()
-            await session.refresh(subtask)
-            return subtask
-
 
 class TaskPreview(PydModel):
     id: uuid.UUID

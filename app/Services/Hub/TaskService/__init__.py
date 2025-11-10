@@ -2,13 +2,13 @@ import uuid
 from datetime import datetime
 
 from fastapi import HTTPException
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.orm import selectinload
 
 from app.Infrastructure.Storage import _upload_to_bunny
-from app.Objects.tasks.SubtaskModel import Subtask, SubtaskBase
+from app.Objects.tasks.SubtaskModel import Subtask, SubtaskBase, SubtaskStatus
 from app.Objects.tasks.TaskAttachment import TaskAttachment, TaskComment
-from app.Objects.tasks.TaskModel import Task
+from app.Objects.tasks.TaskModel import Task, TaskStatus
 from app.Objects.tasks.TaskTags import TaskTag
 from app.Objects.UserModel import User
 from app.Services.Hub.TaskService.contracts import (
@@ -547,19 +547,46 @@ class TaskService:
             "new_name": subtask.name
         }
 
-    async def SetSubtaskCompleted(self, task_id, subtask_id, is_completed, user):
+    async def SetSubtaskCompleted(self, task_id, subtask_id, is_completed: bool, user):
         # 🔍 Знаходимо підзадачу
         subtask = await self.db.get(Subtask, subtask_id)
         if not subtask or subtask.task_id != task_id:
             raise HTTPException(status_code=404, detail="subtask_not_found")
 
-        # ✅ Оновлюємо статус
-        subtask.status = "completed" if is_completed else "pending"
+        # ✅ Оновлюємо статус підзадачі
+        subtask.status = SubtaskStatus.COMPLETED.value if is_completed else SubtaskStatus.IN_PROGRESS.value
+        await self.db.flush()
+
+        # 🔍 Завантажуємо всі підзадачі задачі
+        subtasks = (
+            await self.db.execute(
+                select(Subtask).where(Subtask.task_id == task_id)
+            )
+        ).scalars().all()
+
+        # 👀 Перевіряємо чи всі виконані
+        all_done = all(s.status == SubtaskStatus.COMPLETED.value for s in subtasks)
+
+        # 🔍 Завантажуємо задачу
+        task = await self.db.get(Task, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
+        # 🎯 Оновлюємо статус задачі залежно від підзадач
+        if all_done:
+            task.status = TaskStatus.done
+            task.completed_at = func.now()
+        else:
+            # Якщо хоча б одна не виконана, повертаємо в in_progress
+            task.status = TaskStatus.in_progress
+            task.completed_at = None
+
         await self.db.commit()
 
         return {
             "subtask_id": str(subtask.id),
-            "status": subtask.status
+            "subtask_status": subtask.status,
+            "task_status": task.status.value
         }
 
     async def DeleteSubtask(self, task_id, subtask_id, user):
@@ -568,11 +595,37 @@ class TaskService:
         if not subtask or subtask.task_id != task_id:
             raise HTTPException(status_code=404, detail="subtask_not_found")
 
+        task = await self.db.get(Task, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+
         # ❌ Видаляємо підзадачу
         await self.db.delete(subtask)
+        await self.db.flush()  # 👈 не коммітимо тут
+
+        # ♻️ Отримуємо оновлений список підзадач через SELECT
+        result = await self.db.execute(
+            select(Subtask).where(Subtask.task_id == task_id)
+        )
+        remaining_subtasks = result.scalars().all()
+
+        # 🎯 Перераховуємо статус задачі
+        if len(remaining_subtasks) == 0:
+            task.status = TaskStatus.in_progress
+            task.completed_at = None
+        else:
+            completed_count = sum(1 for s in remaining_subtasks if s.status == "completed")
+            if completed_count == len(remaining_subtasks):
+                task.status = TaskStatus.done
+                task.completed_at = func.now()
+            else:
+                task.status = TaskStatus.in_progress
+                task.completed_at = None
+
         await self.db.commit()
 
         return {
-            "subtask_id": str(subtask.id)
+            "subtask_id": str(subtask_id),
+            "task_status": task.status.value,
+            "total_subtasks": len(remaining_subtasks),
         }
-

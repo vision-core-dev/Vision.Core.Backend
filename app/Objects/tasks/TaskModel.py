@@ -80,6 +80,8 @@ class TaskPreview(PydModel):
     started_at: datetime | None = None
     deadline_at: datetime | None = None
     assignees: list[uuid.UUID]
+    subtasks_total: int = 0
+    subtasks_completed: int = 0
 
 class TaskAssigneeBase(PydModel):
     id: uuid.UUID

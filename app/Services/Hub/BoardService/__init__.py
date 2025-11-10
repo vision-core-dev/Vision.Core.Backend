@@ -3,7 +3,7 @@ from datetime import datetime
 
 from fastapi import HTTPException, UploadFile
 from sqlalchemy import select, or_
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.Infrastructure.Storage import _upload_to_bunny, _delete_from_bunny
@@ -78,6 +78,7 @@ class BoardService:
         # 🟩 4. Отримуємо задачі разом з assignees
         tasks_result = await self.db.execute(
             select(Task)
+            .options(joinedload(Task.subtasks))
             .where(
                 Task.board_id == board_id,
                 or_(Task.is_archived.is_(False), Task.is_archived.is_(None)),
@@ -114,7 +115,11 @@ class BoardService:
                     priority=t.priority,
                     started_at=t.started_at,
                     deadline_at=t.deadline_at,
-                    assignees=t.assignee_ids or []
+                    assignees=t.assignee_ids or [],
+
+                    # 🔥 Підрахунок підзадач
+                    subtasks_total=len(t.subtasks) if t.subtasks else 0,
+                    subtasks_completed=sum(1 for s in t.subtasks if s.status == "completed")
                 )
                 for t in tasks
             ],

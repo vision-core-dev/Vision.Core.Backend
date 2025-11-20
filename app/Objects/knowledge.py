@@ -63,19 +63,38 @@ class KnowledgeDocument(Base):
     folder_id = Column(UUID(as_uuid=True), ForeignKey("KnowledgeFolders.id"), nullable=True)
     author_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"), nullable=False, index=True)
 
-    # ⚠️ Без ForeignKey, просто raw UUID
+    # raw UUID for current version
     current_version_id = Column(UUID(as_uuid=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    folder = relationship("KnowledgeFolder", back_populates="documents", lazy="selectin")
-    # 🧠 Тут ключовий момент: foreign()
-    current_version = relationship(
-        "KnowledgeVersion",
-        primaryjoin="foreign(KnowledgeDocument.current_version_id)==KnowledgeVersion.id",
-        viewonly=True,
+    # ---------- RELATIONSHIPS ----------
+
+    folder = relationship(
+        "KnowledgeFolder",
+        back_populates="documents",
+        lazy="selectin"
+    )
+
+    # 🧑‍💻 Автор документа
+    author = relationship(
+        "User",
         lazy="joined"
     )
 
-    versions = relationship("KnowledgeVersion", back_populates="document", cascade="all, delete-orphan")
+    # 📝 Поточна версія документа
+    current_version = relationship(
+        "KnowledgeVersion",
+        primaryjoin="foreign(KnowledgeDocument.current_version_id)==KnowledgeVersion.id",
+        lazy="joined",
+        viewonly=True
+    )
+
+    # 📚 Всі версії документа
+    versions = relationship(
+        "KnowledgeVersion",
+        back_populates="document",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )

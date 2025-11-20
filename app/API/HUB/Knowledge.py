@@ -28,6 +28,7 @@ async def get_document(
 ):
     service = KnowledgeService(db)
     doc = await service.get_document(doc_id)
+
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
@@ -36,10 +37,16 @@ async def get_document(
             "id": str(doc.id),
             "title": doc.title,
             "content": doc.current_version.content if doc.current_version else "",
-            "author_id": str(doc.author_id),
+            "author": {
+                "id": str(doc.author.id),
+                "avatar_url": doc.author.avatar_url,
+                "first_name": doc.author.first_name,
+                "last_name": doc.author.last_name,
+            },
             "updated_at": doc.updated_at,
         },
     }
+
 
 
 # 🧠 Створити новий документ (тільки для WRITE-доступу)

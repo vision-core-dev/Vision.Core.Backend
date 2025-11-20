@@ -139,9 +139,17 @@ class KnowledgeService:
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    # 🔍 Отримати один документ з поточною версією
     async def get_document(self, document_id: str) -> Optional[KnowledgeDocument]:
-        query = select(KnowledgeDocument).where(KnowledgeDocument.id == document_id)
+        query = (
+            select(KnowledgeDocument)
+            .where(KnowledgeDocument.id == document_id)
+            .options(
+                selectinload(KnowledgeDocument.current_version),
+                selectinload(KnowledgeDocument.folder),
+                selectinload(KnowledgeDocument.author),  # ⭐ додаємо автора
+            )
+        )
+
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 

@@ -106,49 +106,6 @@ class KnowledgeService:
 
         return [serialize(r) for r in roots]
 
-    # async def get_accessible_tree(self, role_id: str):
-    #     access_stmt = select(KnowledgeAccess).where(KnowledgeAccess.role_id == role_id)
-    #     result = await self.db.execute(access_stmt)
-    #     accesses = result.scalars().all()
-    #
-    #     folder_ids = set()
-    #     for a in accesses:
-    #         if a.folder_id:
-    #             folder_ids.add(a.folder_id)
-    #         elif a.document_id:
-    #             doc_stmt = select(KnowledgeDocument.folder_id).where(KnowledgeDocument.id == a.document_id)
-    #             doc_res = await self.db.execute(doc_stmt)
-    #             folder_id = doc_res.scalar_one_or_none()
-    #             if folder_id:
-    #                 folder_ids.add(folder_id)
-    #
-    #     if not folder_ids:
-    #         return []
-    #
-    #     folders_stmt = (
-    #         select(KnowledgeFolder)
-    #         .where(KnowledgeFolder.id.in_(folder_ids))
-    #         .options(
-    #             selectinload(KnowledgeFolder.documents),
-    #             selectinload(KnowledgeFolder.subfolders)
-    #         )
-    #     )
-    #     folders = (await self.db.execute(folders_stmt)).scalars().unique().all()
-    #
-    #     def serialize_folder(folder: KnowledgeFolder):
-    #         return {
-    #             "id": str(folder.id),
-    #             "name": folder.name,
-    #             "parent_id": str(folder.parent_id) if folder.parent_id else None,
-    #             "documents": [
-    #                 {"id": str(doc.id), "title": doc.title}
-    #                 for doc in (folder.documents or [])
-    #             ],
-    #             "subfolders": [serialize_folder(sub) for sub in (folder.subfolders or [])],
-    #         }
-    #
-    #     return [serialize_folder(f) for f in folders]
-
     async def get_folders_with_access(self, role_id: str) -> list[KnowledgeFolder]:
         """
         Повертає тільки ті папки, до яких у ролі користувача є доступ READ або WRITE.

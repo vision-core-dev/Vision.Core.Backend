@@ -326,3 +326,47 @@ async def reject_withdrawal_request(
         "status": "rejected",
         "message": "withdrawal_request_rejected",
     }
+
+
+@finance_router.get("/GetUnwithdrawnList")
+async def get_unwithdrawn_list(
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    # 🟢 1. Отримуємо всіх юзерів з позитивним балансом
+    users_result = await db.execute(
+        select(User)
+        .where(User.balance > 0)
+        .order_by(User.created_at.asc())
+    )
+    users = users_result.scalars().all()
+
+    response = []
+
+    # 🟢 2. Для кожного юзера шукаємо останню виплату
+    for u in users:
+        last_withdraw = await db.execute(
+            select(Transaction)
+            .where(
+                Transaction.user_id == u.id,
+                Transaction.type == TransactionType.WITHDRAWAL,
+                Transaction.is_removed == False
+            )
+            .order_by(Transaction.transaction_at.desc())
+            .limit(1)
+        )
+        last_tx = last_withdraw.scalar_one_or_none()
+
+        response.append({
+            "user": {
+                "id": str(u.id),
+                "first_name": u.first_name,
+                "last_name": u.last_name,
+                "avatar_url": u.avatar_url,
+            },
+            "amount": float(u.balance or 0),
+            "last_withdraw_amount": float(last_tx.amount) if last_tx else 0.0,
+            "last_withdraw_at": last_tx.transaction_at.isoformat() if last_tx else None,
+        })
+
+    return {"items": response}

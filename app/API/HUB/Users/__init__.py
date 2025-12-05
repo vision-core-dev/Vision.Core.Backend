@@ -16,8 +16,8 @@ users_router = APIRouter(prefix="/Users", tags=["Hub > Users"])
 
 # 📜 Отримати всіх користувачів
 @users_router.get("/List", response_model=UsersListResponse)
-async def list_users(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
-    return await UserService(db).GetUsersList()
+async def list_users(only_active: bool = False, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    return await UserService(db).GetUsersList(only_active=only_active)
 
 
 # ➕ Створити користувача

@@ -27,9 +27,9 @@ class UserService:
         result = await AuthService(self.db).RegisterUser(email, password, first_name)
         return CreateUserResponse(user_id=result.user_id)
 
-    async def GetUsersList(self) -> UsersListResponse:
+    async def GetUsersList(self, only_active: bool = False) -> UsersListResponse:
         stmt = await self.db.execute(
-            select(User).options(selectinload(User.role))
+            select(User).where(User.is_active == only_active if only_active else True).options(selectinload(User.role))
         )
         result = stmt.scalars().all()
         return UsersListResponse(total=len(result), list=result)

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
+import redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.Infrastructure.Database import getdb
@@ -13,12 +14,12 @@ auth_router = APIRouter(prefix="/Auth", tags=["Hub > Auth"])
 
 @auth_router.post("/Login", response_model=LoginResponse)
 async def login(data: LoginRequest, db: AsyncSession = Depends(getdb)):
-    return await AuthService(db).Login(data.email, data.password)
+    return await AuthService(db, redis).Login(data.email, data.password)
 
 
 @auth_router.get("/CheckMe", response_model=CheckMeResponse, dependencies=[Depends(HTTPBearer(auto_error=False))])
 async def me(user: User = Depends(getuser_check_me), db: AsyncSession = Depends(getdb)):
-    return await AuthService(db).CheckMe(user)
+    return await AuthService(db, redis).CheckMe(user)
 
 
 @auth_router.post("/AcceptOffer")

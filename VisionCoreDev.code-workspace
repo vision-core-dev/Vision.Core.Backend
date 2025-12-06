@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"name": "VisionCoreDevBackend",
+			"path": "."
+		},
+		{
+			"path": "../../../../WebstormProjects/vision-core-hub-frontend"
+		}
+	],
+	"settings": {}
+}

@@ -17,19 +17,19 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     print("🚀 Starting application...")
     try:
-        # app.state.redis = None
-        # app.state.redis = await connect_redis()
+        app.state.redis = await connect_redis()
 
         # async with engine.begin() as conn:
         #     await conn.run_sync(Base.metadata.create_all)
 
         # await CurrencyService().RefreshExchangeRate(redis=app.state.redis, currency_code="UAH")
+        
         yield
     except Exception as e:
         print(f"❌ Failed to start application: {e}")
         raise
     finally:
-        # await disconnect_redis(app.state.redis)
+        await disconnect_redis(app.state.redis)
         print("👋 Application stopped")
 
 app = FastAPI(

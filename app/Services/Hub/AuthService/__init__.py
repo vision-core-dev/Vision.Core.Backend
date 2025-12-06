@@ -29,7 +29,6 @@ class AuthService:
         if not user.hashed_password or not check_password(password, user.hashed_password):
             raise HTTPException(status_code=400, detail="invalid_password")
 
-        # 🔑 Якщо роль не задана — знайдемо роль із key="default" і призначимо її
         if not user.role_id:
             default_role_result = await self.db.execute(
                 select(UserRole).where(UserRole.key == "default")
@@ -52,7 +51,6 @@ class AuthService:
         if not user:
             raise HTTPException(status_code=400, detail="user_not_found")
 
-        # 🔎 Отримуємо роль користувача
         role_result = await self.db.execute(
             select(UserRole).where(UserRole.id == user.role_id)
         )

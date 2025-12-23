@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
+from bson import ObjectId
 from fastapi import APIRouter
 from fastapi.params import Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -20,10 +21,8 @@ class UserDataResponse(BaseModel):
 
 def normalize_user(doc: dict) -> HangoutUserData:
     doc["_id"] = str(doc["_id"])
+    return HangoutUserData(**doc)
 
-    return HangoutUserData(
-        **doc
-    )
 
 @hangout_data_router.post("/Users/GetUserData", response_model=UserDataResponse)
 async def get_user_data(
@@ -41,7 +40,7 @@ async def get_user_data(
 
         await collection.update_one(
             {"_id": user["_id"]},
-            {"$set": normalized.dict(by_alias=True)}
+            {"$set": normalized.dict(by_alias=True, exclude={"_id"})}
         )
 
         return {"user_data": normalized}
@@ -78,8 +77,8 @@ async def save_user_data(
         return {"success": False}
 
     await collection.update_one(
-        {"_id": data.user_data.id},
-        {"$set": data.user_data.dict(by_alias=True)}
+        {"_id": ObjectId(data.user_data.id)},
+        {"$set": data.user_data.dict(by_alias=True, exclude={"_id"})}
     )
 
     return {"success": True}

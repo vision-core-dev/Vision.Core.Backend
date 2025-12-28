@@ -34,3 +34,6 @@ hub_router.include_router(finance_router)
 
 from .VisionBot import vision_bot_router
 hub_router.include_router(vision_bot_router)
+
+from  .forms import forms_router
+hub_router.include_router(forms_router)

@@ -142,3 +142,4 @@ class MeUserBase(PydModel):
     is_need_accept_terms: bool
     is_terms_accepted: bool
     terms_accepted_at: Optional[datetime]
+    is_active: bool

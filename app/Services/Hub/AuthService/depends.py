@@ -80,7 +80,7 @@ async def _get_user_by_token(
     if not user:
         raise HTTPException(status_code=401, detail="user_not_found")
 
-    if not user.is_active:
+    if (not user.is_active) and not is_check_me:
         raise HTTPException(status_code=401, detail="user_is_deactivated")
 
     # 🧠 Якщо не акцепт і не CheckMe — блокуємо

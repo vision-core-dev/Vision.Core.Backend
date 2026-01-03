@@ -18,8 +18,14 @@ class Jobs(BaseModel):
 class HangoutUserData(BaseModel):
     id: Optional[str] = Field(None, alias="_id")
     rbx_user_id: int
+    playtime: int = 0
+    long_session: int = 0
+    driven_distance: int = 0
     money: int = 0
     jobs: Jobs = Jobs()
     last_login_at: datetime = Field(default_factory=datetime.utcnow)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        populate_by_name = True

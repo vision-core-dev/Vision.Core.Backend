@@ -17,8 +17,8 @@ class Jobs(BaseModel):
 
 class StampData(BaseModel):
     page: int
-    x: int
-    y: int
+    x: float
+    y: float
 
 
 class HangoutUserData(BaseModel):

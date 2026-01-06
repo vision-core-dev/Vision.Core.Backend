@@ -61,7 +61,12 @@ async def get_user_data(
 
         await collection.update_one(
             {"_id": user["_id"]},
-            {"$set": normalized.dict(by_alias=True, exclude={"_id"})}
+            {
+                "$set": normalized.dict(
+                    by_alias=True,
+                    exclude={"_id", "id"}
+                )
+            }
         )
 
         return {"user_data": normalized}
@@ -70,11 +75,14 @@ async def get_user_data(
         return {"user_data": None}
 
     new_user = HangoutUserData(
-        rbx_user_id=data.rbx_user_id
+        rbx_user_id=data.rbx_user_id,
     )
 
     result = await collection.insert_one(
-        new_user.dict(by_alias=True, exclude={"_id", "id"})
+        new_user.dict(
+            by_alias=True,
+            exclude={"_id", "id"}
+        )
     )
 
     new_user.id = str(result.inserted_id)
@@ -100,7 +108,12 @@ async def save_user_data(
 
     await collection.update_one(
         {"_id": ObjectId(data.user_data.id)},
-        {"$set": data.user_data.dict(by_alias=True, exclude={"_id"})}
+        {
+            "$set": data.user_data.dict(
+                by_alias=True,
+                exclude={"_id", "id"}
+            )
+        }
     )
 
     return {"success": True}

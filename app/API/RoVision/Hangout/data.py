@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.params import Depends, Header
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
-from rich import status
+from starlette import status
 
 from app.API.RoVision.Hangout.game_data import HangoutUserData
 from app.Infrastructure.Mongo import getrvhmongo

@@ -74,7 +74,7 @@ async def get_user_data(
     )
 
     result = await collection.insert_one(
-        new_user.dict(by_alias=True)
+        new_user.dict(by_alias=True, exclude={"_id", "id"})
     )
 
     new_user.id = str(result.inserted_id)

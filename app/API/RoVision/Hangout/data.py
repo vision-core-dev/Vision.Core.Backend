@@ -1,16 +1,17 @@
-from datetime import datetime
 from typing import Optional
 
 from bson import ObjectId
-from fastapi import APIRouter
-from fastapi.params import Depends
+from fastapi import APIRouter, HTTPException
+from fastapi.params import Depends, Header
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
+from rich import status
 
 from app.API.RoVision.Hangout.game_data import HangoutUserData
 from app.Infrastructure.Mongo import getrvhmongo
 
 hangout_data_router = APIRouter()
+hangout_token = "HEyd6U7!5T3$7nTbyq$wWVfvAbjAV*h#mqaZ3TdfV6HUVe6FgbPpGfCAYAz7yyAP"
 
 class GetUserDataRequest(BaseModel):
     rbx_user_id: Optional[int] = None
@@ -23,10 +24,30 @@ def normalize_user(doc: dict) -> HangoutUserData:
     doc["_id"] = str(doc["_id"])
     return HangoutUserData(**doc)
 
+async def _token(
+    authorization: str | None = Header(None)
+) -> bool:
+
+    raw_token = None
+
+    if authorization:
+        if authorization.lower().startswith("bearer "):
+            raw_token = authorization.split(" ", 1)[1].strip()
+        else:
+            raw_token = authorization.strip()
+
+    if raw_token == hangout_token:
+        return True
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="missing_authentication_token"
+    )
 
 @hangout_data_router.post("/Users/GetUserData", response_model=UserDataResponse)
 async def get_user_data(
     data: GetUserDataRequest,
+    token: bool = Depends(_token),
     mongo: AsyncIOMotorDatabase = Depends(getrvhmongo)
 ):
     collection = mongo["users"]
@@ -69,6 +90,7 @@ class SaveUserDataResponse(BaseModel):
 @hangout_data_router.post("/Users/SaveUserData", response_model=SaveUserDataResponse)
 async def save_user_data(
     data: SaveUserDataRequest,
+    token: bool = Depends(_token),
     mongo: AsyncIOMotorDatabase = Depends(getrvhmongo)
 ):
     collection = mongo["users"]

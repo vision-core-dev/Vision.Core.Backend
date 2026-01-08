@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from fastapi import HTTPException, UploadFile
 from sqlalchemy import select, or_
@@ -181,6 +182,45 @@ class BoardService:
         await self.db.commit()
         await self.db.refresh(new_list)
         return {"ok": True, "id": new_list.id}
+
+    async def UpdateList(
+            self,
+            board_id: uuid.UUID,
+            list_id: uuid.UUID,
+            name: Optional[str],
+            color: Optional[str],
+            actor: User
+    ):
+        # 1. Перевіряємо дошку
+        board = await self.db.get(Board, board_id)
+        if not board:
+            raise HTTPException(status_code=404, detail="board_not_found")
+
+        await self._check_board_admin(board, actor)
+
+        # 2. Отримуємо список
+        lst = await self.db.get(BoardList, list_id)
+        if not lst or lst.board_id != board_id:
+            raise HTTPException(status_code=404, detail="list_not_found")
+
+        # 3. Апдейт полів (partial update)
+        if name is not None:
+            lst.name = name.strip()
+
+        if color is not None:
+            lst.color = color
+
+        # 4. Commit
+        await self.db.commit()
+        await self.db.refresh(lst)
+
+        return {
+            "ok": True,
+            "id": lst.id,
+            "name": lst.name,
+            "color": lst.color,
+            "order": lst.order,
+        }
 
     async def RemoveList(self, board_id: uuid.UUID, list_id: uuid.UUID, actor: User):
         board = await self.db.get(Board, board_id)

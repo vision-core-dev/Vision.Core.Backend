@@ -100,6 +100,7 @@ class BoardService:
                     first_name=u.first_name,
                     last_name=u.last_name,
                     avatar_url=u.avatar_url,
+                    is_active=u.is_active,
                 )
                 for u in users
             ],

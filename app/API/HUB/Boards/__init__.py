@@ -70,6 +70,19 @@ async def remove_list(
     return await BoardService(db).RemoveList(board_id, list_id, user)
 
 
+@boards_router.post("/{board_id}/UpdateName")
+async def update_board_name(
+    board_id: uuid.UUID,
+    data: dict = Body(...),
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    """
+    Змінює назву дошки.
+    """
+    return await BoardService(db).UpdateBoardName(board_id, data.get("name"), user)
+
+
 @boards_router.post("/{board_id}/UploadBanner")
 async def upload_banner(
     board_id: uuid.UUID,

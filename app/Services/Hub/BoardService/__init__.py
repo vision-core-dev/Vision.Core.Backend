@@ -377,3 +377,13 @@ class BoardService:
         await self.db.commit()
         await self.db.refresh(board)
         return {"ok": True, "role": new_role}
+
+    async def UpdateBoardName(self, board_id: uuid.UUID, new_name: str, actor: User):
+        board = await self.db.get(Board, board_id)
+        if not board:
+            raise HTTPException(status_code=404, detail="board_not_found")
+        await self._check_board_admin(board, actor)
+        board.name = new_name
+        await self.db.commit()
+        await self.db.refresh(board)
+        return {"ok": True, "name": board.name}

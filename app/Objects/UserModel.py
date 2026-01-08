@@ -110,6 +110,7 @@ class UserPreview(PydModel):
     first_name: str | None
     last_name: str | None
     avatar_url: str | None
+    birthday: datetime | None = None
     role: Optional[UserRolePreview] = None
     role_name: str | None = None
     is_active: bool = False

@@ -19,3 +19,6 @@ async def get_unread_notifies_count(user: User = Depends(getuser), db: AsyncSess
 
 from .Notifies import notifies_router
 user_me_router.include_router(notifies_router)
+
+from .MyProfile import my_profile_router
+user_me_router.include_router(my_profile_router)

@@ -55,4 +55,3 @@ async def upload_avatar(
     return {
         "avatar_url": file_url,
     }
-    

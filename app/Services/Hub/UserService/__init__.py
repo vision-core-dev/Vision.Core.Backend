@@ -23,8 +23,8 @@ class UserService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def CreateUser(self, email: str | EmailStr, password: str, first_name: str) -> CreateUserResponse:
-        result = await AuthService(self.db).RegisterUser(email, password, first_name)
+    async def CreateUser(self, email: str | EmailStr, password: str, first_name: str, role_id: uuid.UUID | None =None) -> CreateUserResponse:
+        result = await AuthService(self.db).RegisterUser(email, password, first_name, role_id=role_id)
         return CreateUserResponse(user_id=result.user_id)
 
     async def GetUsersList(self, only_active: bool = False) -> UsersListResponse:

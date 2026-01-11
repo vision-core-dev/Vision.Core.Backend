@@ -27,7 +27,7 @@ async def create_user(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
-    return await UserService(db).CreateUser(data.email, data.password, data.first_name)
+    return await UserService(db).CreateUser(data.email, data.password, data.first_name, data.role_id)
 
 
 # 👤 Деталі користувача

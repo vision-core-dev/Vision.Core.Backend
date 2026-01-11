@@ -68,7 +68,7 @@ class AuthService:
             role=MyUserRoleBase.from_orm(role),
         )
 
-    async def RegisterUser(self, email: str | EmailStr, password: str, first_name: str = "Name") -> RegisterUserResponse:
+    async def RegisterUser(self, email: str | EmailStr, password: str, first_name: str = "Name", role_id: uuid.UUID | None = None) -> RegisterUserResponse:
         if not email or not password:
             raise HTTPException(status_code=400, detail="provide_email_and_password")
 
@@ -87,15 +87,18 @@ class AuthService:
         if len(password) < 8:
             raise HTTPException(status_code=400, detail="password_too_short")
 
+        final_role_id = role_id if role_id is not None else default_role.id
+
         new_user = User(
             email=email,
             hashed_password=get_hashed_password(password),
             is_active=True,
             first_name=first_name,
-            role_id=str(default_role.id),
+            role_id=final_role_id,
             supervisor_ids=[],
             temp_token=uuid.uuid4(),
         )
+
         self.db.add(new_user)
         await self.db.commit()
         await self.db.refresh(new_user)

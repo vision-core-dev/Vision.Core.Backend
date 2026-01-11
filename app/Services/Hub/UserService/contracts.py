@@ -20,6 +20,7 @@ class CreateUserRequest(BaseModel):
     email: EmailStr
     first_name: str
     password: str
+    role_id: Optional[UUID] = None
 
 
 class CreateUserResponse(BaseModel):

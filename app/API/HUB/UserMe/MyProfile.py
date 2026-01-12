@@ -24,13 +24,6 @@ async def set_birthday(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb),
 ):
-    # 🛡 якщо вже встановлено — можна заборонити (опціонально)
-    if user.birthday is not None:
-        raise HTTPException(
-            status_code=400,
-            detail="Дата народження вже встановлена"
-        )
-
     # 🕒 date -> datetime (UTC)
     birthday_dt = datetime.combine(
         data.birthday,

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 my_profile_router = APIRouter()
 
-ALLOWED_TYPES = {"image/png", "image/jpeg", "image/webp"}
+ALLOWED_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
 MAX_SIZE = 5 * 1024 * 1024  # 5 MB
 
 

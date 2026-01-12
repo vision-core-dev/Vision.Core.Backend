@@ -1,6 +1,9 @@
 import uuid
+from datetime import date, datetime, time, timezone
+
 from fastapi import APIRouter, UploadFile, Depends, HTTPException
 from fastapi.params import File
+from pydantic import BaseModel
 from starlette import status
 
 from app.Infrastructure.Storage import _upload_to_bunny
@@ -10,6 +13,44 @@ from app.Infrastructure.Database import getdb
 from sqlalchemy.ext.asyncio import AsyncSession
 
 my_profile_router = APIRouter()
+
+
+class SetBirthdayRequest(BaseModel):
+    birthday: date
+
+@my_profile_router.post("/SetBirthday", status_code=200)
+async def set_birthday(
+    data: SetBirthdayRequest,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb),
+):
+    # 🛡 якщо вже встановлено — можна заборонити (опціонально)
+    if user.birthday is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Дата народження вже встановлена"
+        )
+
+    # 🕒 date -> datetime (UTC)
+    birthday_dt = datetime.combine(
+        data.birthday,
+        time.min,
+        tzinfo=timezone.utc
+    )
+
+    user.birthday = birthday_dt
+
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    return {
+        "status": "ok",
+        "birthday": user.birthday.isoformat()
+    }
+
+
+
 
 ALLOWED_TYPES = {"image/png", "image/jpeg", "image/webp"}
 MAX_SIZE = 5 * 1024 * 1024  # 5 MB

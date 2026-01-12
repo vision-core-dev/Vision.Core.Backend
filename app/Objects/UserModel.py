@@ -138,6 +138,7 @@ class MeUserBase(PydModel):
     first_name: Optional[str]
     last_name: Optional[str]
     avatar_url: Optional[str]
+    birthday: datetime | None
     is_balance_visible: bool
     balance: float
     is_need_accept_terms: bool

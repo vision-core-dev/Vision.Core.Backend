@@ -44,4 +44,5 @@ class BoardPreview(PydModel):
     id: uuid.UUID
     name: str
     description: str | None
+    banner_url: str | None = None
     created_at: datetime

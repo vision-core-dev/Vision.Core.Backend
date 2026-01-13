@@ -50,6 +50,7 @@ class BoardService:
                 "id": b.id,
                 "name": b.name,
                 "description": b.description,
+                "banner_url": b.banner_url,
                 "created_at": b.created_at,
             }
             for b in visible_boards

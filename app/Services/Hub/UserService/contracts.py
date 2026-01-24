@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
@@ -27,6 +28,15 @@ class CreateUserResponse(BaseModel):
     user_id: UUID
 
 
+class UserTaskPreview(BaseModel):
+    id: UUID
+    name: str
+    status: str
+    deadline_at: Optional[datetime] = None
+    board_id: UUID
+    list_name: Optional[str] = None
+
+
 class UserDetailsResponse(BaseModel):
     user: UserBase
     actions: list[str] = []
@@ -34,6 +44,7 @@ class UserDetailsResponse(BaseModel):
     subordinates: list[UserPreview] = []
     badges: list[UserBadgeBase] = []
     transactions: list[TransactionBase] = []
+    tasks: list[UserTaskPreview] = []
 
     class Config:
         from_attributes = True

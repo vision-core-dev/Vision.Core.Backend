@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload, joinedload
 from app.Objects.BadgeModel import UserBadge, Badge, UserBadgeBase
 from app.Objects.UserModel import User, UserRole
 from app.Objects.finance.TransactionModel import Transaction
+from app.Objects.tasks.TaskModel import Task
 from app.Services.Hub.AuthService import AuthService, get_hashed_password
 from app.Services.Hub.UserService.contracts import (
     UsersListResponse,
@@ -15,7 +16,8 @@ from app.Services.Hub.UserService.contracts import (
     CreateUserRequest,
     CreateUserResponse,
     ActivateUserResponse,
-    DeactivateUserResponse
+    DeactivateUserResponse,
+    UserTaskPreview
 )
 
 
@@ -97,13 +99,38 @@ class UserService:
         )
         transactions = transactions_result.scalars().all()
 
+        # 📝 Задачі користувача
+        tasks_stmt = (
+            select(Task)
+            .where(Task.assignee_ids.any(user_id))
+            .where(Task.is_archived == False)
+            .where(Task.is_removed == False)
+            .options(selectinload(Task.list))
+            .order_by(Task.deadline_at.asc())
+        )
+        tasks_result = await self.db.execute(tasks_stmt)
+        user_tasks = tasks_result.scalars().all()
+        
+        tasks_list = [
+            UserTaskPreview(
+                id=t.id,
+                name=t.name,
+                status=t.status.value if hasattr(t.status, "value") else str(t.status),
+                deadline_at=t.deadline_at,
+                board_id=t.board_id,
+                list_name=t.list.name if t.list else None
+            )
+            for t in user_tasks
+        ]
+
         return UserDetailsResponse(
             user=user,
             actions=actions,
             supervisors=supervisors,
             subordinates=subordinates,
             badges=badges,
-            transactions=transactions
+            transactions=transactions,
+            tasks=tasks_list
         )
 
     async def ChangeUserRole(self, user_id: uuid.UUID, new_role_id: uuid.UUID, actor: User) -> UserDetailsResponse:

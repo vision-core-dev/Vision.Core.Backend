@@ -8,6 +8,7 @@ from app.Objects.UserModel import User
 from app.Services.Hub.AuthService.depends import getuser
 from app.Services.Hub.BoardService import BoardService
 from app.Services.Hub.BoardService.contracts import CreateTaskRequest, CreateTaskResponse
+from .websocket import notify_board_update
 
 task_router = APIRouter(prefix="/Tasks")
 
@@ -18,7 +19,7 @@ async def create_task(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
-    return await BoardService(db).CreateTask(
+    result = await BoardService(db).CreateTask(
         board_id=board_id,
         list_id=data.list_id,
         name=data.name,
@@ -29,3 +30,8 @@ async def create_task(
         value_uah=data.value_uah,
         created_by=user
     )
+    
+    # Notify all connected clients about the new task
+    await notify_board_update(board_id, action="task_created", data={"task_id": str(result.task_id)})
+    
+    return result

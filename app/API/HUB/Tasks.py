@@ -124,7 +124,24 @@ async def move_task_to_list(
     list_id = payload.get("list_id")
     if not list_id:
         raise HTTPException(status_code=400, detail="list_id_required")
-    return await TaskService(db).MoveTaskToList(task_id, uuid.UUID(list_id), user)
+    
+    result = await TaskService(db).MoveTaskToList(task_id, uuid.UUID(list_id), user)
+    
+    # Get board_id from task to notify WebSocket clients
+    try:
+        from app.API.HUB.Boards.websocket import notify_board_update
+        task_details = await TaskService(db).GetTaskDetails(task_id, user)
+        if task_details and task_details.task and task_details.task.board_id:
+            await notify_board_update(
+                task_details.task.board_id,
+                action="task_moved",
+                data={"task_id": str(task_id), "new_list_id": list_id}
+            )
+    except Exception as e:
+        print(f"Error notifying WebSocket clients: {e}")
+    
+    return result
+
 
 
 @tasks_router.post("/{task_id}/SetTaskOrder")

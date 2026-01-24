@@ -119,3 +119,6 @@ async def set_board_banner(
 
 from .members import board_members_router
 boards_router.include_router(board_members_router)
+
+from .websocket import board_ws_router
+boards_router.include_router(board_ws_router)

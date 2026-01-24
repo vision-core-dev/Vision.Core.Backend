@@ -51,10 +51,13 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:8000",
         "http://localhost:5173",
+        # Allow Railway preview deployments
+        "https://*.railway.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 app.include_router(api_router)

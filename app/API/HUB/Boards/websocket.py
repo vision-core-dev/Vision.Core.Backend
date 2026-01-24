@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.Infrastructure.Database import getdb
 
-board_ws_router = APIRouter(prefix="/Boards")
+board_ws_router = APIRouter()
 
 
 class BoardConnectionManager:

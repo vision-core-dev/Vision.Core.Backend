@@ -5,9 +5,6 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.Infrastructure.Database import getdb
-from app.Objects.UserModel import User
-from app.Services.Hub.AuthService.depends import getuser_ws
-from app.Services.Hub.BoardService import BoardService
 
 board_ws_router = APIRouter(prefix="/Boards")
 

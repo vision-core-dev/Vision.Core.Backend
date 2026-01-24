@@ -591,6 +591,7 @@ class TaskService:
 
         await self.db.commit()
 
+        return {
             "subtask_id": str(subtask.id),
             "subtask_status": subtask.status,
             "task_status": task.status.value,
@@ -632,6 +633,7 @@ class TaskService:
 
         await self.db.commit()
 
+        return {
             "subtask_id": str(subtask_id),
             "task_status": task.status.value,
             "total_subtasks": len(remaining_subtasks),

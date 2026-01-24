@@ -150,7 +150,7 @@ class TaskService:
             update(Task).where(Task.id == task_id).values(assignee_ids=list(current_ids))
         )
         await self.db.commit()
-        return {"ok": True}
+        return {"ok": True, "board_id": str(task.board_id)}
 
     # ❌ Зняти користувача
     async def UnassignUser(self, task_id: uuid.UUID, user_id: uuid.UUID):
@@ -167,7 +167,7 @@ class TaskService:
             update(Task).where(Task.id == task_id).values(assignee_ids=list(current_ids))
         )
         await self.db.commit()
-        return {"ok": True}
+        return {"ok": True, "board_id": str(task.board_id)}
 
     # 🏷️ Додати мітку
     async def AssignTag(self, task_id: uuid.UUID, tag_id: uuid.UUID):
@@ -188,7 +188,7 @@ class TaskService:
             update(Task).where(Task.id == task_id).values(tags=list(current_tags))
         )
         await self.db.commit()
-        return {"ok": True}
+        return {"ok": True, "board_id": str(task.board_id)}
 
     # ❌ Зняти мітку
     async def UnassignTag(self, task_id: uuid.UUID, tag_id: uuid.UUID):
@@ -205,7 +205,7 @@ class TaskService:
             update(Task).where(Task.id == task_id).values(tags=list(current_tags))
         )
         await self.db.commit()
-        return {"ok": True}
+        return {"ok": True, "board_id": str(task.board_id)}
 
 
     async def ArchiveTask(self, task_id: uuid.UUID, user):
@@ -223,7 +223,8 @@ class TaskService:
         return {
             "ok": True,
             "message": f"Task {task.name} archived successfully",
-            "task_id": str(task.id)
+            "task_id": str(task.id),
+            "board_id": str(task.board_id)
         }
 
 
@@ -242,7 +243,8 @@ class TaskService:
         return {
             "ok": True,
             "message": f"Task {task.name} description updated successfully",
-            "task_id": str(task.id)
+            "task_id": str(task.id),
+            "board_id": str(task.board_id)
         }
 
     async def UpdateTaskName(self, task_id: uuid.UUID, name: str, user):
@@ -260,7 +262,8 @@ class TaskService:
         return {
             "ok": True,
             "message": f"Task name updated successfully",
-            "task_id": str(task.id)
+            "task_id": str(task.id),
+            "board_id": str(task.board_id)
         }
 
 
@@ -455,6 +458,7 @@ class TaskService:
             "message": "Task reordered successfully",
             "task_id": str(task.id),
             "new_order": new_order,
+            "board_id": str(task.board_id)
         }
 
     async def UpdateTaskDates(self, task_id, deadline_at, started_at, completed_at, user):
@@ -497,7 +501,9 @@ class TaskService:
             "task_id": str(task.id),
             "deadline_at": task.deadline_at,
             "started_at": task.started_at,
+            "started_at": task.started_at,
             "completed_at": task.completed_at,
+            "board_id": str(task.board_id)
         }
 
     async def GetSubtasks(self, task_id, user):
@@ -542,9 +548,11 @@ class TaskService:
         subtask.name = new_name
         await self.db.commit()
 
+        task = await self.db.get(Task, task_id)
         return {
             "subtask_id": str(subtask.id),
-            "new_name": subtask.name
+            "new_name": subtask.name,
+            "board_id": str(task.board_id) if task else None
         }
 
     async def SetSubtaskCompleted(self, task_id, subtask_id, is_completed: bool, user):
@@ -583,10 +591,10 @@ class TaskService:
 
         await self.db.commit()
 
-        return {
             "subtask_id": str(subtask.id),
             "subtask_status": subtask.status,
-            "task_status": task.status.value
+            "task_status": task.status.value,
+            "board_id": str(task.board_id)
         }
 
     async def DeleteSubtask(self, task_id, subtask_id, user):
@@ -624,8 +632,8 @@ class TaskService:
 
         await self.db.commit()
 
-        return {
             "subtask_id": str(subtask_id),
             "task_status": task.status.value,
             "total_subtasks": len(remaining_subtasks),
+            "board_id": str(task.board_id)
         }

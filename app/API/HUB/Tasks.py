@@ -8,6 +8,13 @@ from app.Objects.UserModel import User
 from app.Services.Hub.TaskService import TaskService
 from app.Services.Hub.TaskService.contracts import TaskDetailsResponse
 
+async def _notify_update(board_id, action, data):
+    try:
+        from app.API.HUB.Boards.websocket import notify_board_update
+        await notify_board_update(board_id, action, data)
+    except Exception as e:
+        print(f"Error notifying WS: {e}")
+
 tasks_router = APIRouter(prefix="/Tasks", tags=["Tasks"])
 
 # 🔹 Деталі задачі
@@ -21,7 +28,10 @@ async def assign_user(task_id: uuid.UUID, payload: dict, db: AsyncSession = Depe
     user_id = payload.get("user_id")
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id_required")
-    return await TaskService(db).AssignUser(task_id, uuid.UUID(user_id))
+    res = await TaskService(db).AssignUser(task_id, uuid.UUID(user_id))
+    if res.get("board_id"):
+        await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})
+    return res
 
 # 🔹 Зняти користувача
 @tasks_router.post("/{task_id}/UnassignUser")
@@ -29,7 +39,10 @@ async def unassign_user(task_id: uuid.UUID, payload: dict, db: AsyncSession = De
     user_id = payload.get("user_id")
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id_required")
-    return await TaskService(db).UnassignUser(task_id, uuid.UUID(user_id))
+    res = await TaskService(db).UnassignUser(task_id, uuid.UUID(user_id))
+    if res.get("board_id"):
+        await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})
+    return res
 
 # 🔹 Додати мітку
 @tasks_router.post("/{task_id}/AssignTag")
@@ -37,7 +50,10 @@ async def assign_tag(task_id: uuid.UUID, payload: dict, db: AsyncSession = Depen
     tag_id = payload.get("tag_id")
     if not tag_id:
         raise HTTPException(status_code=400, detail="tag_id_required")
-    return await TaskService(db).AssignTag(task_id, uuid.UUID(tag_id))
+    res = await TaskService(db).AssignTag(task_id, uuid.UUID(tag_id))
+    if res.get("board_id"):
+        await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})
+    return res
 
 # 🔹 Зняти мітку
 @tasks_router.post("/{task_id}/UnassignTag")
@@ -45,12 +61,18 @@ async def unassign_tag(task_id: uuid.UUID, payload: dict, db: AsyncSession = Dep
     tag_id = payload.get("tag_id")
     if not tag_id:
         raise HTTPException(status_code=400, detail="tag_id_required")
-    return await TaskService(db).UnassignTag(task_id, uuid.UUID(tag_id))
+    res = await TaskService(db).UnassignTag(task_id, uuid.UUID(tag_id))
+    if res.get("board_id"):
+        await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})
+    return res
 
 # 🔹 Архівувати задачу
 @tasks_router.post("/{task_id}/Archive")
 async def archive_task(task_id: uuid.UUID, db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
-    return await TaskService(db).ArchiveTask(task_id, user)
+    res = await TaskService(db).ArchiveTask(task_id, user)
+    if res.get("board_id"):
+        await _notify_update(res["board_id"], "task_archived", {"task_id": str(task_id)})
+    return res
 
 
 @tasks_router.post("/{task_id}/UpdateDescription")
@@ -58,7 +80,10 @@ async def update_task_description(task_id: uuid.UUID, payload: dict, db: AsyncSe
     description = payload.get("description")
     if description is None:
         raise HTTPException(status_code=400, detail="description_required")
-    return await TaskService(db).UpdateTaskDescription(task_id, description, user)
+    res = await TaskService(db).UpdateTaskDescription(task_id, description, user)
+    if res.get("board_id"):
+        await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})
+    return res
 
 
 @tasks_router.post("/{task_id}/UpdateName")
@@ -66,7 +91,10 @@ async def update_task_name(task_id: uuid.UUID, payload: dict, db: AsyncSession =
     name = payload.get("name")
     if name is None:
         raise HTTPException(status_code=400, detail="name_required")
-    return await TaskService(db).UpdateTaskName(task_id, name, user)
+    res = await TaskService(db).UpdateTaskName(task_id, name, user)
+    if res.get("board_id"):
+        await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})
+    return res
 
 
 @tasks_router.post("/{task_id}/Attachments/UploadFile")
@@ -155,7 +183,10 @@ async def set_task_order(
     list_id = payload.get("list_id")
     if order is None and list_id is None:
         raise HTTPException(status_code=400, detail="new_order_required")
-    return await TaskService(db).SetTaskOrder(task_id, order, list_id, user)
+    res = await TaskService(db).SetTaskOrder(task_id, order, list_id, user)
+    if res.get("board_id"):
+        await _notify_update(res["board_id"], "task_moved", {"task_id": str(task_id)})
+    return res
 
 
 @tasks_router.post("/{task_id}/UpdateDates")
@@ -168,13 +199,16 @@ async def update_dates(
     deadline_at = payload.get("deadline_at")
     started_at = payload.get("started_at")
     completed_at = payload.get("completed_at")
-    return await TaskService(db).UpdateTaskDates(
+    res = await TaskService(db).UpdateTaskDates(
         task_id,
         deadline_at=deadline_at,
         started_at=started_at,
         completed_at=completed_at,
         user=user
     )
+    if res.get("board_id"):
+        await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})
+    return res
 
 from .Subtasks import subtasks_router
 tasks_router.include_router(subtasks_router)

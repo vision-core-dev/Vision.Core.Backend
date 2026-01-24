@@ -32,6 +32,6 @@ async def create_task(
     )
     
     # Notify all connected clients about the new task
-    await notify_board_update(board_id, action="task_created", data={"task_id": str(result.task_id)})
+    await notify_board_update(board_id, action="task_created", data={"task_id": str(result["id"])})
     
     return result

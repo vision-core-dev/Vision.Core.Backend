@@ -417,7 +417,8 @@ class TaskService:
         return {
             "ok": True,
             "message": "Task moved to new list successfully",
-            "list_id": str(task.list_id)
+            "list_id": str(task.list_id),
+            "board_id": str(task.board_id)
         }
 
     async def SetTaskOrder(self, task_id: uuid.UUID, order: int | None, list_id: uuid.UUID, user):

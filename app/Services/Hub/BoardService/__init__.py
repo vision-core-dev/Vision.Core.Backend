@@ -144,6 +144,14 @@ class BoardService:
         self.db.add(new_tag)
         await self.db.commit()
         await self.db.refresh(new_tag)
+        
+        # 🔔 WebSocket сповіщення
+        await self._notify_board_update(board_id, "tag_created", {
+            "tag_id": str(new_tag.id),
+            "name": new_tag.name,
+            "color": new_tag.color,
+        })
+        
         return {"ok": True, "id": new_tag.id}
 
     async def RemoveTag(self, board_id: uuid.UUID, tag_id: uuid.UUID, actor: User):
@@ -156,8 +164,19 @@ class BoardService:
         tag = await self.db.get(TaskTag, tag_id)
         if not tag or getattr(tag, "board_id", None) != board_id:
             raise HTTPException(status_code=404, detail="tag_not_found")
+        
+        # Зберігаємо дані перед видаленням
+        tag_name = tag.name
+        
         await self.db.delete(tag)
         await self.db.commit()
+        
+        # 🔔 WebSocket сповіщення
+        await self._notify_board_update(board_id, "tag_removed", {
+            "tag_id": str(tag_id),
+            "tag_name": tag_name,
+        })
+        
         return {"ok": True}
 
 
@@ -182,6 +201,15 @@ class BoardService:
         self.db.add(new_list)
         await self.db.commit()
         await self.db.refresh(new_list)
+        
+        # 🔔 WebSocket сповіщення
+        await self._notify_board_update(board_id, "list_created", {
+            "list_id": str(new_list.id),
+            "name": new_list.name,
+            "color": new_list.color,
+            "order": new_list.order,
+        })
+        
         return {"ok": True, "id": new_list.id}
 
     async def UpdateList(
@@ -204,16 +232,34 @@ class BoardService:
         if not lst or lst.board_id != board_id:
             raise HTTPException(status_code=404, detail="list_not_found")
 
+        # Зберігаємо старі значення для сповіщення
+        old_name = lst.name
+        old_color = lst.color
+        changed_fields = []
+
         # 3. Апдейт полів (partial update)
         if name is not None:
             lst.name = name.strip()
+            if old_name != lst.name:
+                changed_fields.append("name")
 
         if color is not None:
             lst.color = color
+            if old_color != lst.color:
+                changed_fields.append("color")
 
         # 4. Commit
         await self.db.commit()
         await self.db.refresh(lst)
+        
+        # 🔔 WebSocket сповіщення
+        if changed_fields:
+            await self._notify_board_update(board_id, "list_updated", {
+                "list_id": str(lst.id),
+                "name": lst.name,
+                "color": lst.color,
+                "changed_fields": changed_fields,
+            })
 
         return {
             "ok": True,
@@ -233,8 +279,19 @@ class BoardService:
         lst = await self.db.get(BoardList, list_id)
         if not lst or lst.board_id != board_id:
             raise HTTPException(status_code=404, detail="list_not_found")
+        
+        # Зберігаємо дані перед видаленням
+        list_name = lst.name
+        
         await self.db.delete(lst)
         await self.db.commit()
+        
+        # 🔔 WebSocket сповіщення
+        await self._notify_board_update(board_id, "list_removed", {
+            "list_id": str(list_id),
+            "list_name": list_name,
+        })
+        
         return {"ok": True}
 
     async def SetBoardBanner(self, board_id: uuid.UUID, banner_url: str, actor: User):
@@ -352,6 +409,15 @@ class BoardService:
                 status_code=403,
                 detail="permission_denied_not_admin"
             )
+    
+    async def _notify_board_update(self, board_id: uuid.UUID, action: str, data: dict = None):
+        """🔔 Відправляє WebSocket сповіщення про зміни на дошці"""
+        try:
+            from app.API.HUB.Boards.websocket import notify_board_update
+            await notify_board_update(board_id, action, data)
+        except Exception as e:
+            # Не блокуємо основну операцію, якщо WebSocket не працює
+            print(f"⚠️ WebSocket notification failed: {e}")
 
     async def AddBoardMember(self, board_id: uuid.UUID, user_id: uuid.UUID, actor: User, role: str = "member"):
         board = await self.db.get(Board, board_id)
@@ -424,7 +490,18 @@ class BoardService:
         if not board:
             raise HTTPException(status_code=404, detail="board_not_found")
         await self._check_board_admin(board, actor)
+        
+        # Зберігаємо стару назву
+        old_name = board.name
+        
         board.name = new_name
         await self.db.commit()
         await self.db.refresh(board)
+        
+        # 🔔 WebSocket сповіщення
+        await self._notify_board_update(board_id, "board_renamed", {
+            "old_name": old_name,
+            "new_name": new_name,
+        })
+        
         return {"ok": True, "name": board.name}

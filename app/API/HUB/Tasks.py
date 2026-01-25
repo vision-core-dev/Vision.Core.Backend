@@ -28,7 +28,7 @@ async def assign_user(task_id: uuid.UUID, payload: dict, db: AsyncSession = Depe
     user_id = payload.get("user_id")
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id_required")
-    res = await TaskService(db).AssignUser(task_id, uuid.UUID(user_id))
+    res = await TaskService(db).AssignUser(task_id, uuid.UUID(user_id), current_user=user)
     if res.get("board_id"):
         await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})
     return res

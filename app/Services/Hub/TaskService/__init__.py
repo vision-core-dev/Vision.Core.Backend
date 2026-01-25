@@ -6,6 +6,7 @@ from sqlalchemy import select, update, func
 from sqlalchemy.orm import selectinload
 
 from app.Infrastructure.Storage import _upload_to_bunny
+from app.Objects.LogModel import ActionType
 from app.Objects.tasks.SubtaskModel import Subtask, SubtaskBase, SubtaskStatus
 from app.Objects.tasks.TaskAttachment import TaskAttachment, TaskComment
 from app.Objects.tasks.TaskModel import Task, TaskStatus
@@ -14,6 +15,7 @@ from app.Objects.UserModel import User
 from app.Services.Hub.TaskService.contracts import (
     TaskDetailsResponse, UserPreview, TagPreview, AttachmentPreview, CommentPreview
 )
+from app.Services.LogService import LogService
 
 
 class TaskService:
@@ -136,7 +138,7 @@ class TaskService:
         )
 
     # ✅ Призначити користувача
-    async def AssignUser(self, task_id: uuid.UUID, user_id: uuid.UUID):
+    async def AssignUser(self, task_id: uuid.UUID, user_id: uuid.UUID, current_user: User = None):
         task = await self.db.get(Task, task_id)
         if not task:
             raise HTTPException(status_code=404, detail="task_not_found")
@@ -145,11 +147,31 @@ class TaskService:
         if user_id in current_ids:
             return {"ok": True, "message": "already_assigned"}
 
+        old_assignees = list(current_ids)
         current_ids.add(user_id)
+        new_assignees = list(current_ids)
+        
         await self.db.execute(
-            update(Task).where(Task.id == task_id).values(assignee_ids=list(current_ids))
+            update(Task).where(Task.id == task_id).values(assignee_ids=new_assignees)
         )
         await self.db.commit()
+        
+        # Логування
+        await LogService.log_action(
+            db=self.db,
+            actor_id=current_user.id if current_user else None,
+            entity_type="Task",
+            entity_id=task_id,
+            entity_name=task.name,
+            action=ActionType.ASSIGN,
+            details=f"Призначено користувача {user_id} на задачу",
+            extra_data={
+                "assigned_user_id": str(user_id),
+                "old_assignees": [str(uid) for uid in old_assignees],
+                "new_assignees": [str(uid) for uid in new_assignees],
+            }
+        )
+        
         return {"ok": True, "board_id": str(task.board_id)}
 
     # ❌ Зняти користувача
@@ -219,6 +241,17 @@ class TaskService:
         # ⚙️ Позначаємо як архівовану
         task.is_archived = True
         await self.db.commit()
+        
+        # Логування
+        await LogService.log_action(
+            db=self.db,
+            actor_id=user.id if user else None,
+            entity_type="Task",
+            entity_id=task_id,
+            entity_name=task.name,
+            action=ActionType.ARCHIVE,
+            details=f"Задачу '{task.name}' заархівовано",
+        )
 
         return {
             "ok": True,
@@ -255,9 +288,25 @@ class TaskService:
         if not task:
             raise HTTPException(status_code=404, detail="task_not_found")
 
+        # Зберігаємо стару назву для логування
+        old_name = task.name
+        
         # ✏️ Оновлюємо назву
         task.name = name
         await self.db.commit()
+        
+        # Логування
+        await LogService.log_update(
+            db=self.db,
+            actor_id=user.id if user else None,
+            entity_type="Task",
+            entity_id=task_id,
+            entity_name=name,
+            old_values={"name": old_name},
+            new_values={"name": name},
+            changed_fields=["name"],
+            details=f"Назву задачі змінено з '{old_name}' на '{name}'",
+        )
 
         return {
             "ok": True,

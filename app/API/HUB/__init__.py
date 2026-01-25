@@ -37,3 +37,9 @@ hub_router.include_router(vision_bot_router)
 
 from  .forms import forms_router
 hub_router.include_router(forms_router)
+
+from .Logs import router as logs_router
+hub_router.include_router(logs_router)
+
+from .online_websocket import online_ws_router
+hub_router.include_router(online_ws_router)

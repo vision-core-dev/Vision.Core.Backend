@@ -45,7 +45,7 @@ class User(Base):
 
     # ✅ Додаємо ForeignKey до UserRoles.id
     role_id = Column(UUID(as_uuid=True), ForeignKey("UserRoles.id", ondelete="SET NULL"), nullable=True)
-    role = relationship("UserRole", backref=backref("users", lazy="selectin"))
+    role = relationship("UserRole", lazy="selectin", backref=backref("users", lazy="selectin"))
 
     supervisor_ids = Column(ARRAY(UUID(as_uuid=True)), nullable=True, default=[])
 

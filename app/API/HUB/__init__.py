@@ -43,3 +43,6 @@ hub_router.include_router(logs_router)
 
 from .online_websocket import online_ws_router
 hub_router.include_router(online_ws_router)
+
+from .OrgStructure import org_structure_router
+hub_router.include_router(org_structure_router)

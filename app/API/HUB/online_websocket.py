@@ -165,9 +165,12 @@ async def online_users_websocket(
                 # Broadcast updated online users list
                 await online_manager.broadcast_online_users()
                 
+        except WebSocketDisconnect:
+            # Client disconnected during identification
+            return
         except Exception as e:
             print(f"Error during identification: {e}")
-            await websocket.close()
+            # Do not attempt to close if already disconnected to avoid RuntimeError
             return
         
         # Listen for messages (mainly keepalive pings)

@@ -28,8 +28,15 @@ class ChatUpdate(BaseModel):
 
 class MessageCreate(BaseModel):
     """Створення повідомлення"""
-    content: str = Field(..., min_length=1, max_length=10000)
+    content: Optional[str] = Field(None, max_length=10000)
     reply_to_id: Optional[str] = None
+    
+    # Media fields
+    message_type: str = "text"
+    attachment_url: Optional[str] = None
+    attachment_name: Optional[str] = None
+    attachment_size: Optional[int] = None
+    audio_duration: Optional[int] = None
 
 
 class AddMemberRequest(BaseModel):
@@ -75,6 +82,13 @@ class MessageResponse(BaseModel):
     updated_at: str
     sender: Optional[UserShortResponse] = None
     reply_to: Optional["MessageResponse"] = None
+    
+    # Media fields
+    message_type: str
+    attachment_url: Optional[str] = None
+    attachment_name: Optional[str] = None
+    attachment_size: Optional[int] = None
+    audio_duration: Optional[int] = None
 
 
 class ChatResponse(BaseModel):

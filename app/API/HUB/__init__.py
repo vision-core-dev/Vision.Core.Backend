@@ -46,3 +46,9 @@ hub_router.include_router(online_ws_router)
 
 from .OrgStructure import org_structure_router
 hub_router.include_router(org_structure_router)
+
+from .Chat import chat_router
+hub_router.include_router(chat_router)
+
+from .chat_websocket import chat_ws_router
+hub_router.include_router(chat_ws_router)

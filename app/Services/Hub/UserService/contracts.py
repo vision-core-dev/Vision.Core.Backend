@@ -45,6 +45,8 @@ class UserDetailsResponse(BaseModel):
     badges: list[UserBadgeBase] = []
     transactions: list[TransactionBase] = []
     tasks: list[UserTaskPreview] = []
+    tasks_total_completed: int = 0
+    tasks_total_active: int = 0
 
     class Config:
         from_attributes = True

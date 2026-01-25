@@ -1,14 +1,14 @@
 import uuid
 from fastapi import HTTPException
 from pydantic import EmailStr
-from sqlalchemy import select, any_
+from sqlalchemy import select, any_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
 
 from app.Objects.BadgeModel import UserBadge, Badge, UserBadgeBase
 from app.Objects.UserModel import User, UserRole
 from app.Objects.finance.TransactionModel import Transaction
-from app.Objects.tasks.TaskModel import Task
+from app.Objects.tasks.TaskModel import Task, TaskStatus
 from app.Services.Hub.AuthService import AuthService, get_hashed_password
 from app.Services.Hub.UserService.contracts import (
     UsersListResponse,
@@ -123,6 +123,23 @@ class UserService:
             for t in user_tasks
         ]
 
+        # 📊 Статистика
+        # 1. Загальна кількість виконаних задач (включаючи архівовані)
+        completed_count_stmt = (
+            select(func.count(Task.id))
+            .where(Task.assignee_ids.any(user_id))
+            .where(Task.status == TaskStatus.done)
+            .where(Task.is_removed == False)
+        )
+        completed_count = (await self.db.execute(completed_count_stmt)).scalar_one()
+
+        # 2. Активні задачі (з тих, що ми вже завантажили - не архівовані, не видалені)
+        # Активні = не 'done' і не 'backlog' (опціонально, але зазвичай активні це в роботі)
+        # Або просто всі, що не 'done', бо backlog теж може бути активним
+        # Якщо брати просто tasks_list, то там відфільтровані is_archived=False
+        # Тому просто рахуємо скільки з них не done
+        active_count = sum(1 for t in user_tasks if t.status != TaskStatus.done)
+
         return UserDetailsResponse(
             user=user,
             actions=actions,
@@ -130,7 +147,9 @@ class UserService:
             subordinates=subordinates,
             badges=badges,
             transactions=transactions,
-            tasks=tasks_list
+            tasks=tasks_list,
+            tasks_total_completed=completed_count,
+            tasks_total_active=active_count
         )
 
     async def ChangeUserRole(self, user_id: uuid.UUID, new_role_id: uuid.UUID, actor: User) -> UserDetailsResponse:

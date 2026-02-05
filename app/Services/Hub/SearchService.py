@@ -2,6 +2,8 @@ from typing import List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_, func, cast, String
 from sqlalchemy.orm import selectinload
+import re
+
 
 from app.Objects.tasks.BoardModel import Board
 from app.Objects.tasks.TaskModel import Task
@@ -42,12 +44,15 @@ class SearchService:
         # Let's search all tasks for now, limited to 5.
         stmt_tasks = select(Task).where(
             Task.name.ilike(search_term)
-        ).options(selectinload(Task.board)).limit(5)
+        ).options(
+            selectinload(Task.board),
+            selectinload(Task.list)
+        ).limit(5)
         tasks = (await self.db.execute(stmt_tasks)).scalars().all()
         results["tasks"] = [{
             "id": str(t.id), 
             "name": t.name, 
-            "description": f"{t.board.name if t.board else ''} • {t.status.value if t.status else ''}",
+            "description": f"{t.board.name if t.board else ''} • {t.list.name if t.list else ''}",
             "board_id": str(t.board_id) if t.board_id else None
         } for t in tasks]
 
@@ -70,15 +75,25 @@ class SearchService:
         fragment_results = []
         for f in fragments:
             # Create a snippet
-            content_lower = f.content.lower()
+            # Remove HTML tags
+            clean_content = re.sub(r'<[^>]+>', '', f.content)
+            clean_content = re.sub(r'\s+', ' ', clean_content) # Normalize whitespace
+            
+            content_lower = clean_content.lower()
             q_lower = query.lower()
+            
             try:
                 idx = content_lower.index(q_lower)
-                start = max(0, idx - 20)
-                end = min(len(f.content), idx + len(query) + 20)
-                snippet = f"...{f.content[start:end]}..."
+                start = max(0, idx - 30)
+                end = min(len(clean_content), idx + len(query) + 30)
+                
+                prefix = "..." if start > 0 else ""
+                suffix = "..." if end < len(clean_content) else ""
+                
+                snippet = f"{prefix}{clean_content[start:end]}{suffix}"
             except ValueError:
-                snippet = "Fragment found"
+                # Fallback if somehow not found in clean text but found in db query
+                snippet = f"{clean_content[:60]}..."
 
             fragment_results.append({
                 "id": str(f.document_id), # Link to doc

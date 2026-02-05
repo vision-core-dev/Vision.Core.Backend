@@ -52,3 +52,6 @@ hub_router.include_router(chat_router)
 
 from .chat_websocket import chat_ws_router
 hub_router.include_router(chat_ws_router)
+
+from .Search import search_router
+hub_router.include_router(search_router)

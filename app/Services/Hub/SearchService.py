@@ -47,7 +47,8 @@ class SearchService:
         results["tasks"] = [{
             "id": str(t.id), 
             "name": t.name, 
-            "description": f"{t.board.name if t.board else ''} • {t.status.value if t.status else ''}" 
+            "description": f"{t.board.name if t.board else ''} • {t.status.value if t.status else ''}",
+            "board_id": str(t.board_id) if t.board_id else None
         } for t in tasks]
 
         # 3. Knowledge Base (Docs)

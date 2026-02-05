@@ -98,7 +98,7 @@ class SearchService:
         users = (await self.db.execute(stmt_users)).scalars().all()
         results["users"] = [{
             "id": str(u.id), 
-            "name": f"{u.first_name} {u.last_name}", 
+            "name": f"{u.first_name} {u.last_name or ''}".strip(), 
             "description": u.email,
             "avatar_url": u.avatar_url
         } for u in users]

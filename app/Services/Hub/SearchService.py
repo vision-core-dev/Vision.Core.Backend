@@ -32,22 +32,22 @@ class SearchService:
         # Checking BoardModel... usually relies on UserBoard association or similar.
         # Assuming simple search for now, refactor later for permissions.
         stmt_boards = select(Board).where(
-            Board.title.ilike(search_term)
+            Board.name.ilike(search_term)
         ).limit(5)
         boards = (await self.db.execute(stmt_boards)).scalars().all()
-        results["boards"] = [{"id": str(b.id), "name": b.title, "description": getattr(b, "description", "")} for b in boards]
+        results["boards"] = [{"id": str(b.id), "name": b.name, "description": getattr(b, "description", "")} for b in boards]
 
         # 2. Tasks
         # Tasks where user is assigned or in the board?
         # Let's search all tasks for now, limited to 5.
         stmt_tasks = select(Task).where(
-            Task.title.ilike(search_term)
+            Task.name.ilike(search_term)
         ).options(selectinload(Task.board)).limit(5)
         tasks = (await self.db.execute(stmt_tasks)).scalars().all()
         results["tasks"] = [{
             "id": str(t.id), 
-            "name": t.title, 
-            "description": f"{t.board.title if t.board else ''} • {t.status_id or ''}" 
+            "name": t.name, 
+            "description": f"{t.board.name if t.board else ''} • {t.status.value if t.status else ''}" 
         } for t in tasks]
 
         # 3. Knowledge Base (Docs)

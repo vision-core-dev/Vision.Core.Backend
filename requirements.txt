@@ -27,7 +27,7 @@ bcrypt
 itsdangerous
 keyring
 
-psycopg2
+psycopg2-binary
 bunnycdnpython
 python-multipart
 pytz

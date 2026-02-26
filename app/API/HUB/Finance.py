@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 
 import pytz
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,9 +13,45 @@ from app.Objects.UserModel import User
 from app.Objects.finance.TransactionModel import Transaction, TransactionType
 from app.Objects.finance.WithdrawalLimitModel import WithdrawalLimitModel
 from app.Objects.finance.WithdrawalRequestModel import WithdrawalRequest, WithdrawalRequestStatus
+from app.Objects.tasks.TaskModel import Task
 from app.Services.Hub.AuthService.depends import getuser
 
 finance_router = APIRouter(prefix="/Finance", tags=["Hub > Finance"])
+
+
+@finance_router.get("/GetRealTimeBalance")
+async def get_real_time_balance(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    """Calculate balance in real-time from transactions instead of stored value."""
+    # Sum all non-removed transactions for this user
+    income_result = await db.execute(
+        select(func.coalesce(func.sum(Transaction.amount), 0.0)).where(
+            Transaction.user_id == user.id,
+            Transaction.is_removed == False,
+            Transaction.type.in_([TransactionType.INCOME, TransactionType.TRANSFER]),
+        )
+    )
+    income = float(income_result.scalar())
+
+    expense_result = await db.execute(
+        select(func.coalesce(func.sum(Transaction.amount), 0.0)).where(
+            Transaction.user_id == user.id,
+            Transaction.is_removed == False,
+            Transaction.type.in_([TransactionType.EXPENSE, TransactionType.WITHDRAWAL, TransactionType.DEDUCTION]),
+        )
+    )
+    expenses = float(expense_result.scalar())
+
+    calculated_balance = income + expenses  # expenses are negative
+
+    # Update stored balance to keep in sync
+    user.balance = calculated_balance
+    await db.commit()
+
+    return {
+        "balance": calculated_balance,
+        "income_total": income,
+        "expense_total": expenses,
+    }
 
 @finance_router.get("/GetSalaryInfo")
 async def get_salary_info(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
@@ -25,20 +61,28 @@ async def get_salary_info(user: User = Depends(getuser), db: AsyncSession = Depe
 
     # 💰 Трансакції
     transactions_result = await db.execute(
-        select(Transaction)
+        select(Transaction, Task)
+        .outerjoin(Task, Transaction.task_id == Task.id)
         .where(Transaction.user_id == user.id, Transaction.is_removed == False)
         .order_by(Transaction.created_at.desc())
     )
-    transactions = [
-        {
+    
+    transactions = []
+    for t, task in transactions_result.all():
+        tx_data = {
             "id": str(t.id),
             "name": t.name,
             "type": t.type.value,
             "amount": float(t.amount),
             "transaction_at": t.transaction_at.isoformat(),
         }
-        for t in transactions_result.scalars().all()
-    ]
+        if task:
+            tx_data["task"] = {
+                "name": task.name,
+                "start_at": task.started_at.isoformat() if task.started_at else None,
+                "deadline_at": task.deadline_at.isoformat() if task.deadline_at else None,
+            }
+        transactions.append(tx_data)
 
     # 💳 Ліміти виводу
     limit_result = await db.execute(
@@ -171,11 +215,25 @@ async def create_withdrawal_request(
 # @finance_router.get("/GetFinanceStats")
 
 @finance_router.get("/GetTransactionsList")
-async def get_transactions_list(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+async def get_transactions_list(
+    page: int = Query(1, ge=1),
+    limit: int = Query(30, le=100),
+    search: str | None = None,
+    user: User = Depends(getuser), 
+    db: AsyncSession = Depends(getdb)
+):
+    query = select(Transaction).where(Transaction.is_removed == False)
+    
+    if search:
+        query = query.where(Transaction.name.ilike(f"%{search}%"))
+        
+    total_count_result = await db.execute(select(func.count()).select_from(query.subquery()))
+    total_count = total_count_result.scalar() or 0
+
     transactions_result = await db.execute(
-        select(Transaction)
-        .where(Transaction.is_removed == False)
-        .order_by(Transaction.created_at.desc())
+        query.order_by(Transaction.created_at.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
     )
     transactions = [
         {
@@ -200,7 +258,13 @@ async def get_transactions_list(user: User = Depends(getuser), db: AsyncSession 
         for u in users_result.scalars().all()
     ]
 
-    return {"transactions": transactions, "users": users}
+    return {
+        "transactions": transactions, 
+        "users": users, 
+        "total_count": total_count, 
+        "page": page, 
+        "limit": limit
+    }
 
 
 class CreateTransactionDataModel(BaseModel):
@@ -258,6 +322,84 @@ async def create_transaction(
         "ids": ids,
         "message": "transaction_created",
     }
+
+@finance_router.post("/UpdateTransaction")
+async def update_transaction(
+    data: dict,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    transaction_id = data.get("transaction_id")
+    if not transaction_id:
+        raise HTTPException(status_code=400, detail="transaction_id_required")
+
+    tx_res = await db.execute(
+        select(Transaction).where(Transaction.id == transaction_id, Transaction.is_removed == False)
+    )
+    tx = tx_res.scalar_one_or_none()
+    if not tx:
+        raise HTTPException(status_code=404, detail="transaction_not_found")
+
+    target_user = await db.get(User, tx.user_id)
+
+    new_name = data.get("name")
+    new_amount = data.get("amount")
+
+    if new_name is not None:
+        tx.name = new_name
+
+    if new_amount is not None:
+        new_amount = float(new_amount)
+        old_amount = float(tx.amount)
+        diff = new_amount - old_amount
+        tx.amount = new_amount
+        if target_user:
+            target_user.balance = (target_user.balance or 0.0) + diff
+
+    await db.commit()
+    await db.refresh(tx)
+
+    return {
+        "id": str(tx.id),
+        "name": tx.name,
+        "amount": float(tx.amount),
+        "type": tx.type.value,
+        "message": "transaction_updated",
+    }
+
+
+@finance_router.post("/DeleteTransaction")
+async def delete_transaction(
+    data: dict,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    transaction_id = data.get("transaction_id")
+    if not transaction_id:
+        raise HTTPException(status_code=400, detail="transaction_id_required")
+
+    tx_res = await db.execute(
+        select(Transaction).where(Transaction.id == transaction_id, Transaction.is_removed == False)
+    )
+    tx = tx_res.scalar_one_or_none()
+    if not tx:
+        raise HTTPException(status_code=404, detail="transaction_not_found")
+
+    # Reverse balance
+    target_user = await db.get(User, tx.user_id)
+    if target_user:
+        target_user.balance = (target_user.balance or 0.0) - float(tx.amount)
+        if tx.type == TransactionType.WITHDRAWAL:
+            target_user.withdrawn_amount = (target_user.withdrawn_amount or 0.0) - (-float(tx.amount))
+
+    tx.is_removed = True
+    await db.commit()
+
+    return {
+        "id": str(tx.id),
+        "message": "transaction_deleted",
+    }
+
 
 @finance_router.post("/ApproveWithdrawalRequest")
 async def approve_withdrawal_request(
@@ -333,18 +475,32 @@ async def get_unwithdrawn_list(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
-    # 🟢 1. Отримуємо всіх юзерів з позитивним балансом
+    # 🟢 1. Отримуємо всіх активних юзерів
     users_result = await db.execute(
-        select(User)
-        .where(User.balance > 0)
-        .order_by(User.created_at.asc())
+        select(User).order_by(User.created_at.asc())
     )
     users = users_result.scalars().all()
 
     response = []
 
-    # 🟢 2. Для кожного юзера шукаємо останню виплату
+    # 🟢 2. Для кожного юзера рахуємо баланс в реальному часі
     for u in users:
+        # Real-time balance calculation
+        balance_result = await db.execute(
+            select(func.coalesce(func.sum(Transaction.amount), 0.0)).where(
+                Transaction.user_id == u.id,
+                Transaction.is_removed == False,
+            )
+        )
+        real_balance = float(balance_result.scalar())
+
+        # Sync stored balance
+        if u.balance != real_balance:
+            u.balance = real_balance
+
+        if real_balance <= 0:
+            continue
+
         last_withdraw = await db.execute(
             select(Transaction)
             .where(
@@ -364,9 +520,11 @@ async def get_unwithdrawn_list(
                 "last_name": u.last_name,
                 "avatar_url": u.avatar_url,
             },
-            "amount": float(u.balance or 0),
+            "amount": real_balance,
             "last_withdraw_amount": float(last_tx.amount) if last_tx else 0.0,
             "last_withdraw_at": last_tx.transaction_at.isoformat() if last_tx else None,
         })
+
+    await db.commit()
 
     return {"items": response}

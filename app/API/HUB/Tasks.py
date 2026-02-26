@@ -206,3 +206,183 @@ async def update_dates(
 
 from .Subtasks import subtasks_router
 tasks_router.include_router(subtasks_router)
+
+
+# ======================== TASK ACCRUALS ========================
+from pydantic import BaseModel
+from app.Objects.finance.TaskAccrualModel import TaskAccrual
+from app.Objects.finance.TransactionModel import Transaction, TransactionType
+from sqlalchemy import select
+
+class CreateAccrualPayload(BaseModel):
+    user_id: str
+    amount: float
+    name: str | None = None
+
+@tasks_router.post("/{task_id}/Accruals/Create")
+async def create_task_accrual(
+    task_id: uuid.UUID,
+    payload: CreateAccrualPayload,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    from app.Objects.tasks.TaskModel import Task
+    
+    if not user.role or user.role.order > 3:
+        raise HTTPException(status_code=403, detail="forbidden")
+    
+    task = await db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="task_not_found")
+
+    target_user = await db.get(User, uuid.UUID(payload.user_id))
+    if not target_user:
+        raise HTTPException(status_code=404, detail="user_not_found")
+
+    accrual_name = payload.name or f"Виплата за задачу: {task.name}"
+
+    # 1. Create accrual record
+    accrual = TaskAccrual(
+        task_id=task_id,
+        user_id=target_user.id,
+        created_by_id=user.id,
+        name=accrual_name,
+        amount=float(payload.amount),
+    )
+    db.add(accrual)
+    await db.flush()
+
+    # 2. Create a corresponding transaction
+    transaction = Transaction(
+        user_id=target_user.id,
+        created_by_id=user.id,
+        task_id=task_id,
+        name=accrual_name,
+        type=TransactionType.INCOME,
+        amount=float(payload.amount),
+        is_removed=False,
+    )
+    db.add(transaction)
+
+    # 3. Update user balance
+    target_user.balance = (target_user.balance or 0.0) + float(payload.amount)
+
+    await db.commit()
+    await db.refresh(accrual)
+
+    return {
+        "id": str(accrual.id),
+        "task_id": str(accrual.task_id),
+        "user_id": str(accrual.user_id),
+        "name": accrual.name,
+        "amount": float(accrual.amount),
+        "created_at": accrual.created_at.isoformat(),
+    }
+
+
+class UpdateAccrualPayload(BaseModel):
+    amount: float | None = None
+    name: str | None = None
+
+@tasks_router.post("/{task_id}/Accruals/{accrual_id}/Update")
+async def update_task_accrual(
+    task_id: uuid.UUID,
+    accrual_id: uuid.UUID,
+    payload: UpdateAccrualPayload,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    if not user.role or user.role.order > 3:
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    accrual = await db.get(TaskAccrual, accrual_id)
+    if not accrual or accrual.task_id != task_id or accrual.is_removed:
+        raise HTTPException(status_code=404, detail="accrual_not_found")
+
+    target_user = await db.get(User, accrual.user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="user_not_found")
+
+    # Handle amount change — adjust user balance
+    if payload.amount is not None and payload.amount != accrual.amount:
+        old_amount = float(accrual.amount)
+        new_amount = float(payload.amount)
+        diff = new_amount - old_amount
+        target_user.balance = (target_user.balance or 0.0) + diff
+        accrual.amount = new_amount
+
+        # Update matching transaction
+        tx_result = await db.execute(
+            select(Transaction).where(
+                Transaction.task_id == task_id,
+                Transaction.user_id == accrual.user_id,
+                Transaction.is_removed == False,
+            ).order_by(Transaction.created_at.desc()).limit(1)
+        )
+        tx = tx_result.scalar_one_or_none()
+        if tx:
+            tx.amount = new_amount
+
+    if payload.name is not None:
+        accrual.name = payload.name
+        # Also update matching transaction name
+        tx_result = await db.execute(
+            select(Transaction).where(
+                Transaction.task_id == task_id,
+                Transaction.user_id == accrual.user_id,
+                Transaction.is_removed == False,
+            ).order_by(Transaction.created_at.desc()).limit(1)
+        )
+        tx = tx_result.scalar_one_or_none()
+        if tx:
+            tx.name = payload.name
+
+    await db.commit()
+    await db.refresh(accrual)
+
+    return {
+        "id": str(accrual.id),
+        "task_id": str(accrual.task_id),
+        "user_id": str(accrual.user_id),
+        "name": accrual.name,
+        "amount": float(accrual.amount),
+        "created_at": accrual.created_at.isoformat(),
+    }
+
+
+@tasks_router.post("/{task_id}/Accruals/{accrual_id}/Delete")
+async def delete_task_accrual(
+    task_id: uuid.UUID,
+    accrual_id: uuid.UUID,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    if not user.role or user.role.order > 3:
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    accrual = await db.get(TaskAccrual, accrual_id)
+    if not accrual or accrual.task_id != task_id:
+        raise HTTPException(status_code=404, detail="accrual_not_found")
+
+    target_user = await db.get(User, accrual.user_id)
+    if target_user:
+        target_user.balance = (target_user.balance or 0.0) - float(accrual.amount)
+
+    # Soft-delete the accrual
+    accrual.is_removed = True
+
+    # Soft-delete the matching transaction
+    tx_result = await db.execute(
+        select(Transaction).where(
+            Transaction.task_id == task_id,
+            Transaction.user_id == accrual.user_id,
+            Transaction.is_removed == False,
+        ).order_by(Transaction.created_at.desc()).limit(1)
+    )
+    tx = tx_result.scalar_one_or_none()
+    if tx:
+        tx.is_removed = True
+
+    await db.commit()
+
+    return {"ok": True, "message": "accrual_deleted"}

@@ -27,6 +27,14 @@ class AttachmentPreview(BaseModel):
     created_at: datetime | None = None
 
 
+class AccrualPreview(BaseModel):
+    id: uuid.UUID
+    user: UserPreview
+    name: Optional[str] = None
+    amount: float
+    created_at: datetime
+
+
 class CommentPreview(BaseModel):
     id: uuid.UUID
     user: UserPreview
@@ -47,6 +55,7 @@ class TaskDetailsResponse(BaseModel):
     completed_at: Optional[datetime]
     attachments: List[AttachmentPreview]
     subtasks: List[SubtaskBase]
+    accruals: List[AccrualPreview] = []
     comments: List[CommentPreview]
     created_by: UserPreview
     created_at: datetime

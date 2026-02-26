@@ -88,6 +88,7 @@ class UserRoleBase(PydModel):
     key: str
     name: str
     menu: list[str]
+    order: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -96,6 +97,7 @@ class MyUserRoleBase(PydModel):
     key: str
     name: str
     menu: list[str]
+    order: int
 
 
 class UserShort(BaseModel):

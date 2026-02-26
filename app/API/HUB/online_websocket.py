@@ -73,10 +73,10 @@ class OnlineUsersManager:
             "timestamp": datetime.now().isoformat()
         }
         
-        # Send to all connected websockets
+        # Send to all connected websockets (copy to avoid mutation during iteration)
         disconnected = []
-        for user_id, websockets in self.connections.items():
-            for ws in websockets:
+        for user_id, websockets in list(self.connections.items()):
+            for ws in set(websockets):
                 try:
                     await ws.send_json(message)
                 except Exception as e:
@@ -93,7 +93,7 @@ class OnlineUsersManager:
             return
         
         disconnected = []
-        for ws in self.connections[user_id]:
+        for ws in set(self.connections[user_id]):
             try:
                 await ws.send_json(message)
             except Exception as e:

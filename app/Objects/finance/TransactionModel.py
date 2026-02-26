@@ -34,6 +34,7 @@ class Transaction(Base):
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"))
     created_by_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"))
+    task_id = Column(UUID(as_uuid=True), ForeignKey("Tasks.id", ondelete="SET NULL"), nullable=True)
 
     is_future = Column(Boolean, default=False, server_default="false")
     is_removed = Column(Boolean, default=False, server_default="false")
@@ -48,4 +49,5 @@ class TransactionBase(PydModel):
     name: str
     type: TransactionType
     amount: float
+    task_id: uuid.UUID | None = None
     transaction_at: datetime

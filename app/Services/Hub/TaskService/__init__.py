@@ -12,8 +12,9 @@ from app.Objects.tasks.TaskAttachment import TaskAttachment, TaskComment
 from app.Objects.tasks.TaskModel import Task, TaskStatus
 from app.Objects.tasks.TaskTags import TaskTag
 from app.Objects.UserModel import User
+from app.Objects.finance.TaskAccrualModel import TaskAccrual
 from app.Services.Hub.TaskService.contracts import (
-    TaskDetailsResponse, UserPreview, TagPreview, AttachmentPreview, CommentPreview
+    TaskDetailsResponse, UserPreview, TagPreview, AttachmentPreview, CommentPreview, AccrualPreview
 )
 from app.Services.LogService import LogService
 
@@ -113,6 +114,33 @@ class TaskService:
         if not creator:
             raise HTTPException(status_code=404, detail="creator_not_found")
 
+        # 🔹 Accruals (виплати по задачі)
+        accruals_result = await self.db.execute(
+            select(TaskAccrual).where(
+                TaskAccrual.task_id == task.id,
+                TaskAccrual.is_removed == False
+            ).order_by(TaskAccrual.created_at)
+        )
+        accruals_list = []
+        for acc in accruals_result.scalars().all():
+            acc_user = await self.db.get(User, acc.user_id)
+            if not acc_user:
+                continue
+            accruals_list.append(
+                AccrualPreview(
+                    id=acc.id,
+                    user=UserPreview(
+                        id=acc_user.id,
+                        first_name=acc_user.first_name,
+                        last_name=acc_user.last_name,
+                        avatar_url=acc_user.avatar_url,
+                    ),
+                    name=acc.name,
+                    amount=float(acc.amount),
+                    created_at=acc.created_at,
+                )
+            )
+
         # ✅ 8. Формуємо фінальну відповідь
         return TaskDetailsResponse(
             id=task.id,
@@ -127,6 +155,7 @@ class TaskService:
             completed_at=task.completed_at,
             attachments=attachments,
             subtasks=subtasks,
+            accruals=accruals_list,
             comments=comments,
             created_by=UserPreview(
                 id=creator.id,

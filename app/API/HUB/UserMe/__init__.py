@@ -22,3 +22,6 @@ user_me_router.include_router(notifies_router)
 
 from .MyProfile import my_profile_router
 user_me_router.include_router(my_profile_router)
+
+from .MyTasks import my_tasks_router
+user_me_router.include_router(my_tasks_router)

@@ -372,7 +372,8 @@ class TaskService:
         return {
             "ok": True,
             "message": "Attachment added successfully",
-            "attachment_id": str(attachment.id),
+            "id": str(attachment.id),
+            "name": attachment.name,
             "url": attachment.url
         }
 
@@ -403,7 +404,8 @@ class TaskService:
         return {
             "ok": True,
             "message": "Attachment uploaded successfully",
-            "attachment_id": str(attachment.id),
+            "id": str(attachment.id),
+            "name": attachment.name,
             "url": attachment.url
         }
 

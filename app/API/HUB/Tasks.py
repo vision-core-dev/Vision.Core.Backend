@@ -22,6 +22,10 @@ tasks_router = APIRouter(prefix="/Tasks", tags=["Tasks"])
 async def get_task_details(task_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
     return await TaskService(db).GetTaskDetails(task_id, user)
 
+@tasks_router.get("/{task_id}/GetPublicDetails", response_model=TaskDetailsResponse)
+async def get_public_task_details(task_id: uuid.UUID, db: AsyncSession = Depends(getdb)):
+    return await TaskService(db).GetPublicTaskDetails(task_id)
+
 # 🔹 Призначити користувача
 @tasks_router.post("/{task_id}/AssignUser")
 async def assign_user(task_id: uuid.UUID, payload: dict, db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):

@@ -26,6 +26,7 @@ class Board(Base):
     created_by_id = Column(UUID(as_uuid=True), ForeignKey("Users.id"))
 
     is_removed = Column(Boolean, default=False, server_default="false")
+    is_public = Column(Boolean, default=False, server_default="false")
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

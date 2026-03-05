@@ -8,7 +8,7 @@ from app.Infrastructure.Database import getdb
 from app.Objects.UserModel import User
 from app.Services.Hub.AuthService.depends import getuser
 from app.Services.Hub.UserService import UserService
-from app.Services.Hub.UserService.contracts import CreateUserResponse, UsersListResponse, UserDetailsResponse, \
+from app.Services.Hub.UserService.contracts import CreateUserResponse, UsersListResponse, UsersPublicListResponse, UserDetailsResponse, \
     CreateUserRequest, ChangeUserPasswordRequest
 
 users_router = APIRouter(prefix="/Users", tags=["Hub > Users"])
@@ -18,6 +18,12 @@ users_router = APIRouter(prefix="/Users", tags=["Hub > Users"])
 @users_router.get("/List", response_model=UsersListResponse)
 async def list_users(only_active: bool = False, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
     return await UserService(db).GetUsersList(only_active=only_active)
+
+
+# 📜 Публічний список користувачів (тільки id, ім'я, аватар)
+@users_router.get("/PublicList", response_model=UsersPublicListResponse)
+async def list_users_public(db: AsyncSession = Depends(getdb)):
+    return await UserService(db).GetPublicUsersList()
 
 
 # ➕ Створити користувача

@@ -12,6 +12,7 @@ from app.Objects.tasks.TaskModel import Task, TaskStatus
 from app.Services.Hub.AuthService import AuthService, get_hashed_password
 from app.Services.Hub.UserService.contracts import (
     UsersListResponse,
+    UsersPublicListResponse,
     UserDetailsResponse,
     CreateUserRequest,
     CreateUserResponse,
@@ -35,6 +36,13 @@ class UserService:
         )
         result = stmt.scalars().all()
         return UsersListResponse(total=len(result), list=result)
+
+    async def GetPublicUsersList(self) -> UsersPublicListResponse:
+        stmt = await self.db.execute(
+            select(User).where(User.is_active == True)
+        )
+        result = stmt.scalars().all()
+        return UsersPublicListResponse(total=len(result), list=result)
 
     async def GetUserDetails(self, user_id: uuid.UUID, actor: User) -> UserDetailsResponse:
         user = await self.db.get(User, user_id)

@@ -5,13 +5,21 @@ from uuid import UUID
 from pydantic import BaseModel, EmailStr
 
 from app.Objects.BadgeModel import UserBadgeBase
-from app.Objects.UserModel import UserBase, UserPreview
+from app.Objects.UserModel import UserBase, UserPreview, UserShort
 from app.Objects.finance.TransactionModel import TransactionBase
 
 
 class UsersListResponse(BaseModel):
     total: int
     list: List[UserPreview]
+
+    class Config:
+        from_attributes = True
+
+
+class UsersPublicListResponse(BaseModel):
+    total: int
+    list: List[UserShort]
 
     class Config:
         from_attributes = True

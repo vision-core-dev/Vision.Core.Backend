@@ -129,6 +129,58 @@ class BoardService:
             tags=tags
         )
 
+    async def GetPublicBoardDetails(self, board_id: uuid.UUID):
+        board = await self.db.get(Board, board_id)
+        if not board:
+            raise HTTPException(status_code=404, detail="board_not_found")
+
+        if not board.is_public:
+            raise HTTPException(status_code=403, detail="board_is_not_public")
+
+        lists_result = await self.db.execute(
+            select(BoardList).where(BoardList.board_id == board_id).order_by(BoardList.order)
+        )
+        lists = lists_result.scalars().all()
+
+        tasks_result = await self.db.execute(
+            select(Task)
+            .options(joinedload(Task.subtasks))
+            .where(
+                Task.board_id == board_id,
+                or_(Task.is_archived.is_(False), Task.is_archived.is_(None)),
+                or_(Task.is_removed.is_(False), Task.is_removed.is_(None))
+            )
+            .order_by(Task.order)
+        )
+        tasks = tasks_result.scalars().unique().all()
+
+        tags_result = await self.db.execute(select(TaskTag).where(TaskTag.board_id == board_id))
+        tags = tags_result.scalars().all()
+
+        return BoardDetailsResponse(
+            board=board,
+            users=[],
+            lists=lists,
+            tasks=[
+                TaskPreview(
+                    id=t.id,
+                    name=t.name,
+                    banner_url=t.banner_url,
+                    list_id=t.list_id,
+                    tags=t.tags or [],
+                    status=t.status,
+                    priority=t.priority,
+                    started_at=t.started_at,
+                    deadline_at=t.deadline_at,
+                    assignees=t.assignee_ids or [],
+                    subtasks_total=len(t.subtasks) if t.subtasks else 0,
+                    subtasks_completed=sum(1 for s in t.subtasks if s.status == "completed")
+                )
+                for t in tasks
+            ],
+            tags=tags
+        )
+
     async def CreateTag(self, board_id: uuid.UUID, name: str, color: str, actor: User):
         board = await self.db.get(Board, board_id)
         if not board:

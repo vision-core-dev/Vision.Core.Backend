@@ -8,7 +8,8 @@ from app.Objects.UserModel import User
 from app.Services.Hub.AuthService.depends import getuser
 from app.Services.Hub.EventService import EventService
 from app.Services.Hub.EventService.contracts import CreateEventRequest, CreateEventResponse, ListEventsResponse, \
-    PublicEventDetailsResponse, ModerateEventDetailsResponse, ChangeEventStatusResponse
+    PublicEventDetailsResponse, ModerateEventDetailsResponse, ChangeEventStatusResponse, \
+    UpdateEventRequest, AddInviteesRequest, GenericSuccessResponse
 
 events_router = APIRouter(prefix="/Events", tags=["Hub > Events"])
 
@@ -68,3 +69,42 @@ async def mark_event_absent(
     db: AsyncSession = Depends(getdb)
 ):
     return await EventService(db).MarkAttendance(event_id, user_id, False)
+
+
+@events_router.post("/{event_id}/Update", response_model=GenericSuccessResponse)
+async def update_event(
+    event_id: str,
+    data: UpdateEventRequest,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    return await EventService(db).UpdateEvent(event_id, data)
+
+
+@events_router.post("/{event_id}/Delete", response_model=GenericSuccessResponse)
+async def delete_event(
+    event_id: str,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    return await EventService(db).DeleteEvent(event_id)
+
+
+@events_router.post("/{event_id}/Invitees/Add", response_model=GenericSuccessResponse)
+async def add_invitees(
+    event_id: str,
+    data: AddInviteesRequest,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    return await EventService(db).AddInvitees(event_id, data)
+
+
+@events_router.post("/{event_id}/Invitees/{user_id}/Remove", response_model=GenericSuccessResponse)
+async def remove_invitee(
+    event_id: str,
+    user_id: str,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb)
+):
+    return await EventService(db).RemoveInvitee(event_id, user_id)

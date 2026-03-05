@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.Infrastructure.Storage import _upload_to_bunny
 from app.Objects.LogModel import ActionType
+from app.Objects.tasks.BoardModel import Board
 from app.Objects.tasks.SubtaskModel import Subtask, SubtaskBase, SubtaskStatus
 from app.Objects.tasks.TaskAttachment import TaskAttachment, TaskComment
 from app.Objects.tasks.TaskModel import Task, TaskStatus
@@ -165,6 +166,154 @@ class TaskService:
             ),
             created_at=task.created_at
         )
+
+    async def GetPublicTaskDetails(self, task_id: uuid.UUID):
+        result = await self.db.execute(
+            select(Task)
+            .where(Task.id == task_id)
+        )
+        task = result.scalar_one_or_none()
+
+        task_board = await self.db.get(Board, task.board_id)
+        if not task_board:
+            raise HTTPException(status_code=404, detail="task_board_not_found")
+
+        if task_board.is_public == False:
+            raise HTTPException(status_code=403, detail="task_board_not_public")
+
+        # 🔹 3. Теги
+        tag_list = []
+        if task.tags:
+            q_tags = await self.db.execute(select(TaskTag).where(TaskTag.id.in_(task.tags)))
+            tag_list = [
+                TagPreview(id=t.id, name=t.name, color=t.color)
+                for t in q_tags.scalars().all()
+            ]
+
+        # 🔹 4. Виконавці
+        assignee_users = []
+        if task.assignee_ids:
+            q_users = await self.db.execute(select(User).where(User.id.in_(task.assignee_ids)))
+            assignee_users = [
+                UserPreview(
+                    id=u.id,
+                    first_name=u.first_name,
+                    last_name=u.last_name,
+                    avatar_url=u.avatar_url
+                )
+                for u in q_users.scalars().all()
+            ]
+
+        # 🔹 5. Вкладення
+        attachments_result = await self.db.execute(
+            select(TaskAttachment).where(TaskAttachment.task_id == task.id)
+        )
+        attachments = [
+            AttachmentPreview(
+                id=a.id,
+                type=a.type.value if hasattr(a.type, "value") else str(a.type),
+                url=a.url,
+                name=a.name,
+                created_at=a.created_at,
+            )
+            for a in attachments_result.scalars().all()
+        ]
+
+        # subtasks
+        q_subtasks = await self.db.execute(
+            select(Subtask).where(Subtask.task_id == task.id).order_by(Subtask.created_at)
+        )
+        subtasks = [
+            SubtaskBase(
+                id=s.id,
+                name=s.name,
+                status=s.status,
+                deadline_at=s.deadline_at,
+                assignee_id=s.assignee_id,
+            )
+            for s in q_subtasks.scalars().all()
+        ]
+
+        # 🔹 6. Коментарі
+        comments_result = await self.db.execute(
+            select(TaskComment).where(TaskComment.task_id == task.id).order_by(TaskComment.created_at)
+        )
+        comments = []
+        for c in comments_result.scalars().all():
+            user = await self.db.get(User, c.user_id)
+            if not user:
+                continue
+            comments.append(
+                CommentPreview(
+                    id=c.id,
+                    user=UserPreview(
+                        id=user.id,
+                        first_name=user.first_name,
+                        last_name=user.last_name,
+                        avatar_url=user.avatar_url
+                    ),
+                    content=c.content,
+                    created_at=c.created_at
+                )
+            )
+
+        # 🔹 7. Автор
+        creator = await self.db.get(User, task.created_by_id)
+        if not creator:
+            raise HTTPException(status_code=404, detail="creator_not_found")
+
+        # 🔹 Accruals (виплати по задачі)
+        accruals_result = await self.db.execute(
+            select(TaskAccrual).where(
+                TaskAccrual.task_id == task.id,
+                TaskAccrual.is_removed == False
+            ).order_by(TaskAccrual.created_at)
+        )
+        accruals_list = []
+        for acc in accruals_result.scalars().all():
+            acc_user = await self.db.get(User, acc.user_id)
+            if not acc_user:
+                continue
+            accruals_list.append(
+                AccrualPreview(
+                    id=acc.id,
+                    user=UserPreview(
+                        id=acc_user.id,
+                        first_name=acc_user.first_name,
+                        last_name=acc_user.last_name,
+                        avatar_url=acc_user.avatar_url,
+                    ),
+                    name=acc.name,
+                    amount=float(acc.amount),
+                    created_at=acc.created_at,
+                )
+            )
+
+        # ✅ 8. Формуємо фінальну відповідь
+        return TaskDetailsResponse(
+            id=task.id,
+            list_id=task.list_id,
+            name=task.name,
+            description=task.description,
+            banner_url=task.banner_url,
+            tags=tag_list,
+            assignees=assignee_users,
+            started_at=task.started_at,
+            deadline_at=task.deadline_at,
+            completed_at=task.completed_at,
+            attachments=attachments,
+            subtasks=subtasks,
+            accruals=accruals_list,
+            comments=comments,
+            created_by=UserPreview(
+                id=creator.id,
+                first_name=creator.first_name,
+                last_name=creator.last_name,
+                avatar_url=creator.avatar_url
+            ),
+            created_at=task.created_at
+        )
+
 
     # ✅ Призначити користувача
     async def AssignUser(self, task_id: uuid.UUID, user_id: uuid.UUID, current_user: User = None):

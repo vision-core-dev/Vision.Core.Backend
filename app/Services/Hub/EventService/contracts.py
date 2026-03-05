@@ -1,7 +1,7 @@
 import uuid
 
 from pydantic import BaseModel
-from datetime import date, time
+import datetime
 
 from app.Objects.EventModel import EventBase, EventInviteBase, EventInviteStatus, EventInviteWithUser
 
@@ -9,9 +9,9 @@ from app.Objects.EventModel import EventBase, EventInviteBase, EventInviteStatus
 class CreateEventRequest(BaseModel):
     name: str
     description: str | None = None
-    date: date
-    time_from: time
-    time_to: time
+    date: datetime.date
+    time_from: datetime.time
+    time_to: datetime.time
     location: str | None = None
     location_url: str | None = None
     invitees: list[uuid.UUID] = []
@@ -42,3 +42,18 @@ class PublicEventDetailsResponse(BaseModel):
 class ChangeEventStatusResponse(BaseModel):
     event_id: uuid.UUID
     status: str
+
+class UpdateEventRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    date: datetime.date | None = None
+    time_from: datetime.time | None = None
+    time_to: datetime.time | None = None
+    location: str | None = None
+    location_url: str | None = None
+
+class AddInviteesRequest(BaseModel):
+    user_ids: list[uuid.UUID]
+
+class GenericSuccessResponse(BaseModel):
+    success: bool = True

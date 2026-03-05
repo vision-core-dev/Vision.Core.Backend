@@ -100,7 +100,7 @@ class MyUserRoleBase(PydModel):
     order: int
 
 
-class UserShort(BaseModel):
+class UserShort(PydModel):
     id: uuid.UUID
     first_name: str
     last_name: str | None = None

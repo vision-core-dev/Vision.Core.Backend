@@ -9,7 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.Objects.EventModel import Event, EventInvite, EventInviteStatus, EventPreview
 from app.Objects.UserModel import User
 from app.Services.Hub.EventService.contracts import CreateEventRequest, CreateEventResponse, ListEventsResponse, \
-    PublicEventDetailsResponse, ModerateEventDetailsResponse, ChangeEventStatusResponse
+    PublicEventDetailsResponse, ModerateEventDetailsResponse, ChangeEventStatusResponse, \
+    UpdateEventRequest, AddInviteesRequest, GenericSuccessResponse
 from app.Services.Hub.NotifyService import NotifyService
 
 
@@ -257,3 +258,93 @@ class EventService:
             event_id=str(event_uuid),
             status=invite.status
         )
+
+    async def UpdateEvent(self, event_id: str, data: UpdateEventRequest) -> GenericSuccessResponse:
+        result = await self.db.execute(
+            select(Event).where(Event.id == uuid.UUID(event_id))
+        )
+        event = result.scalar_one_or_none()
+        if not event:
+            raise HTTPException(status_code=404, detail="event_not_found")
+
+        for field, value in data.model_dump(exclude_none=True).items():
+            setattr(event, field, value)
+
+        await self.db.commit()
+        return GenericSuccessResponse()
+
+    async def DeleteEvent(self, event_id: str) -> GenericSuccessResponse:
+        event_uuid = uuid.UUID(event_id)
+
+        result = await self.db.execute(
+            select(Event).where(Event.id == event_uuid)
+        )
+        event = result.scalar_one_or_none()
+        if not event:
+            raise HTTPException(status_code=404, detail="event_not_found")
+
+        # Delete all invites first
+        invites_result = await self.db.execute(
+            select(EventInvite).where(EventInvite.event_id == event_uuid)
+        )
+        for invite in invites_result.scalars().all():
+            await self.db.delete(invite)
+
+        await self.db.delete(event)
+        await self.db.commit()
+        return GenericSuccessResponse()
+
+    async def AddInvitees(self, event_id: str, data: AddInviteesRequest) -> GenericSuccessResponse:
+        event_uuid = uuid.UUID(event_id)
+
+        result = await self.db.execute(
+            select(Event).where(Event.id == event_uuid)
+        )
+        event = result.scalar_one_or_none()
+        if not event:
+            raise HTTPException(status_code=404, detail="event_not_found")
+
+        # Get existing invitee user_ids to skip duplicates
+        existing_result = await self.db.execute(
+            select(EventInvite.user_id).where(EventInvite.event_id == event_uuid)
+        )
+        existing_ids = {row[0] for row in existing_result.all()}
+
+        date_str = event.date.strftime("%d.%m.%Y")
+        time_from_str = event.time_from.strftime("%H:%M")
+        time_to_str = event.time_to.strftime("%H:%M")
+
+        for user_id in data.user_ids:
+            if user_id in existing_ids:
+                continue
+            new_invite = EventInvite(
+                event_id=event_uuid,
+                user_id=user_id,
+                status="pending"
+            )
+            self.db.add(new_invite)
+
+            await NotifyService(self.db).CreateNotification(
+                user_id,
+                "Запрошення на подію",
+                f"Вас запрошено на подію <b>{event.name}</b> 🗓️ {date_str} 🕐 {time_from_str}–{time_to_str} у {event.location}.",
+                link=f"/calendar/e/{event.id}"
+            )
+
+        await self.db.commit()
+        return GenericSuccessResponse()
+
+    async def RemoveInvitee(self, event_id: str, user_id: str) -> GenericSuccessResponse:
+        invite_result = await self.db.execute(
+            select(EventInvite).where(
+                EventInvite.event_id == uuid.UUID(event_id),
+                EventInvite.user_id == uuid.UUID(user_id)
+            )
+        )
+        invite = invite_result.scalar_one_or_none()
+        if not invite:
+            raise HTTPException(status_code=404, detail="invite_not_found")
+
+        await self.db.delete(invite)
+        await self.db.commit()
+        return GenericSuccessResponse()

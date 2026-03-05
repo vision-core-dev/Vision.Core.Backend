@@ -52,15 +52,16 @@ class BoardConnectionManager:
         """Get list of active users on a board"""
         if board_id not in self.user_presence:
             return []
-        
+
         users = []
         seen_user_ids = set()
-        for user_info in self.user_presence[board_id].values():
+        # Snapshot to avoid dict mutation during iteration
+        for user_info in list(self.user_presence[board_id].values()):
             user_id = user_info.get('user_id')
             if user_id and user_id not in seen_user_ids:
                 users.append(user_info)
                 seen_user_ids.add(user_id)
-        
+
         return users
     
     async def broadcast_user_list(self, board_id: str):
@@ -76,18 +77,18 @@ class BoardConnectionManager:
         """Send a message to all clients connected to a specific board"""
         if board_id not in self.active_connections:
             return
-        
+
+        # Snapshot to avoid "Set changed size during iteration"
+        connections = self.active_connections[board_id].copy()
         disconnected = set()
-        for connection in self.active_connections[board_id]:
+        for connection in connections:
             if connection == exclude:
                 continue
             try:
                 await connection.send_json(message)
-            except Exception as e:
-                print(f"Error sending message: {e}")
+            except Exception:
                 disconnected.add(connection)
-        
-        # Clean up disconnected clients
+
         for conn in disconnected:
             self.disconnect(conn, board_id)
 

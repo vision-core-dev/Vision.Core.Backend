@@ -67,6 +67,11 @@ class Task(Base):
         cascade="all, delete-orphan",
         foreign_keys="[Subtask.task_id]"
     )
+    accruals = relationship(
+        "TaskAccrual",
+        cascade="all, delete-orphan",
+        foreign_keys="[TaskAccrual.task_id]"
+    )
 
 
 class TaskPreview(PydModel):
@@ -82,6 +87,9 @@ class TaskPreview(PydModel):
     assignees: list[uuid.UUID]
     subtasks_total: int = 0
     subtasks_completed: int = 0
+    has_description: bool = False
+    accruals_count: int = 0
+    accruals_sum: float = 0
 
 class TaskAssigneeBase(PydModel):
     id: uuid.UUID

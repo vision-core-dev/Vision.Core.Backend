@@ -77,15 +77,15 @@ class BoardService:
         )
         lists = lists_result.scalars().all()
 
-        # 🟩 4. Отримуємо задачі разом з assignees
+        # 🟩 4. Отримуємо задачі разом з subtasks та accruals
         tasks_result = await self.db.execute(
             select(Task)
-            .options(joinedload(Task.subtasks))
+            .options(joinedload(Task.subtasks), joinedload(Task.accruals))
             .where(
                 Task.board_id == board_id,
                 or_(Task.is_archived.is_(False), Task.is_archived.is_(None)),
                 or_(Task.is_removed.is_(False), Task.is_removed.is_(None))
-            )            .order_by(Task.order)
+            ).order_by(Task.order)
         )
         tasks = tasks_result.scalars().unique().all()
 
@@ -119,10 +119,11 @@ class BoardService:
                     started_at=t.started_at,
                     deadline_at=t.deadline_at,
                     assignees=t.assignee_ids or [],
-
-                    # 🔥 Підрахунок підзадач
                     subtasks_total=len(t.subtasks) if t.subtasks else 0,
-                    subtasks_completed=sum(1 for s in t.subtasks if s.status == "completed")
+                    subtasks_completed=sum(1 for s in t.subtasks if s.status == "completed"),
+                    has_description=bool(t.description and t.description.strip()),
+                    accruals_count=len([a for a in (t.accruals or []) if not a.is_removed]),
+                    accruals_sum=sum(a.amount for a in (t.accruals or []) if not a.is_removed),
                 )
                 for t in tasks
             ],
@@ -144,7 +145,7 @@ class BoardService:
 
         tasks_result = await self.db.execute(
             select(Task)
-            .options(joinedload(Task.subtasks))
+            .options(joinedload(Task.subtasks), joinedload(Task.accruals))
             .where(
                 Task.board_id == board_id,
                 or_(Task.is_archived.is_(False), Task.is_archived.is_(None)),
@@ -174,7 +175,10 @@ class BoardService:
                     deadline_at=t.deadline_at,
                     assignees=t.assignee_ids or [],
                     subtasks_total=len(t.subtasks) if t.subtasks else 0,
-                    subtasks_completed=sum(1 for s in t.subtasks if s.status == "completed")
+                    subtasks_completed=sum(1 for s in t.subtasks if s.status == "completed"),
+                    has_description=bool(t.description and t.description.strip()),
+                    accruals_count=len([a for a in (t.accruals or []) if not a.is_removed]),
+                    accruals_sum=sum(a.amount for a in (t.accruals or []) if not a.is_removed),
                 )
                 for t in tasks
             ],

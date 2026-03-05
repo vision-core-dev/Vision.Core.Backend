@@ -53,7 +53,7 @@ class KnowledgeVersion(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     document = relationship("KnowledgeDocument", back_populates="versions")
-
+    author = relationship("User", lazy="joined")
 
 class KnowledgeDocument(Base):
     __tablename__ = "KnowledgeDocuments"

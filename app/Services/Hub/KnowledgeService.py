@@ -17,11 +17,17 @@ class KnowledgeService:
         return result.scalars().all()
 
     async def get_accessible_tree(self, role_id: str):
+        from app.Objects.UserModel import UserRole
+
+        role = (await self.db.execute(select(UserRole).where(UserRole.id == role_id))).scalar_one_or_none()
+        is_admin = role and role.order <= 1
 
         # 1. Доступи
-        accesses = (await self.db.execute(
-            select(KnowledgeAccess).where(KnowledgeAccess.role_id == role_id)
-        )).scalars().all()
+        accesses = []
+        if not is_admin:
+            accesses = (await self.db.execute(
+                select(KnowledgeAccess).where(KnowledgeAccess.role_id == role_id)
+            )).scalars().all()
 
         allowed_folders = set()
         allowed_docs = set()
@@ -75,7 +81,7 @@ class KnowledgeService:
 
         # 4. serialize()
         def serialize(folder):
-            if str(folder.id) not in allowed_folders:
+            if not is_admin and str(folder.id) not in allowed_folders:
                 return None
 
             return {
@@ -86,7 +92,7 @@ class KnowledgeService:
                 "documents": [
                     {"id": str(d.id), "title": d.title}
                     for d in folder.documents
-                    if (str(folder.id) in allowed_folders) or (str(d.id) in allowed_docs)
+                    if is_admin or (str(folder.id) in allowed_folders) or (str(d.id) in allowed_docs)
                 ],
 
                 "subfolders": [
@@ -98,11 +104,14 @@ class KnowledgeService:
             }
 
         # 5. знаходимо root-и
-        roots = [
-            folder_map[fid]
-            for fid in allowed_folders
-            if folder_map[fid].parent_id is None
-        ]
+        if is_admin:
+            roots = [f for f in all_folders if f.parent_id is None]
+        else:
+            roots = [
+                folder_map[fid]
+                for fid in allowed_folders
+                if folder_map[fid].parent_id is None
+            ]
 
         return [serialize(r) for r in roots]
 
@@ -183,14 +192,129 @@ class KnowledgeService:
         )
         self.db.add(version)
 
-        # Оновлюємо поточну версію
+        # flush щоб отримати ID нової версії до commit
+        await self.db.flush()
+
+        # Явно оновлюємо FK-колонку, а не тільки relationship
         query = select(KnowledgeDocument).where(KnowledgeDocument.id == document_id)
         doc = (await self.db.execute(query)).scalar_one_or_none()
         if doc:
-            doc.current_version = version
+            doc.current_version_id = version.id  # ← явно оновлюємо колонку
 
         await self.db.commit()
+        await self.db.refresh(version)
         return version
+
+    # 📁 CRUD для папок
+    async def create_folder(self, name: str, parent_id: Optional[str] = None) -> KnowledgeFolder:
+        folder = KnowledgeFolder(name=name, parent_id=parent_id)
+        self.db.add(folder)
+        await self.db.commit()
+        await self.db.refresh(folder)
+        return folder
+
+    async def update_folder(self, folder_id: str, name: str) -> Optional[KnowledgeFolder]:
+        folder = (await self.db.execute(select(KnowledgeFolder).where(KnowledgeFolder.id == folder_id))).scalar_one_or_none()
+        if folder:
+            folder.name = name
+            await self.db.commit()
+            await self.db.refresh(folder)
+        return folder
+
+    async def delete_folder(self, folder_id: str) -> bool:
+        from sqlalchemy import delete as sa_delete, text
+
+        # 1️⃣ Рекурсивний CTE: знаходимо ВСІ ID папок у дереві одним SQL-запитом
+        cte_sql = text("""
+            WITH RECURSIVE folder_tree AS (
+                SELECT id FROM "KnowledgeFolders" WHERE id = CAST(:fid AS UUID)
+                UNION ALL
+                SELECT f.id FROM "KnowledgeFolders" f
+                INNER JOIN folder_tree ft ON f.parent_id = ft.id
+            )
+            SELECT id FROM folder_tree
+        """)
+        result = await self.db.execute(cte_sql, {"fid": folder_id})
+        all_ids = [row[0] for row in result.all()]
+
+        if not all_ids:
+            return False
+
+        # 2️⃣ Bulk-видаляємо всі KnowledgeAccess для цих папок одним DELETE
+        await self.db.execute(
+            sa_delete(KnowledgeAccess).where(KnowledgeAccess.folder_id.in_(all_ids))
+        )
+        await self.db.flush()
+
+        # 3️⃣ ORM-видалення кореневої папки (cascade="all, delete" видалить підпапки і документи)
+        folder = (await self.db.execute(
+            select(KnowledgeFolder).where(KnowledgeFolder.id == all_ids[0])
+        )).scalar_one_or_none()
+
+        if folder:
+            await self.db.delete(folder)
+
+        await self.db.commit()
+        return True
+
+    # 📄 CRUD для документів
+    async def update_document(self, document_id: str, title: str) -> Optional[KnowledgeDocument]:
+        doc = (await self.db.execute(select(KnowledgeDocument).where(KnowledgeDocument.id == document_id))).scalar_one_or_none()
+        if doc:
+            doc.title = title
+            await self.db.commit()
+            await self.db.refresh(doc)
+        return doc
+
+    async def delete_document(self, document_id: str) -> bool:
+        doc = (await self.db.execute(select(KnowledgeDocument).where(KnowledgeDocument.id == document_id))).scalar_one_or_none()
+        if doc:
+            await self.db.delete(doc)
+            await self.db.commit()
+            return True
+        return False
+
+    async def get_document_versions(self, document_id: str):
+        query = (
+            select(KnowledgeVersion)
+            .where(KnowledgeVersion.document_id == document_id)
+            .options(selectinload(KnowledgeVersion.author))
+            .order_by(KnowledgeVersion.created_at.desc())
+        )
+        result = await self.db.execute(query)
+        return result.scalars().all()
+
+    async def delete_version(self, version_id: str) -> bool:
+        version = (await self.db.execute(
+            select(KnowledgeVersion).where(KnowledgeVersion.id == version_id)
+        )).scalar_one_or_none()
+
+        if not version:
+            return False
+
+        doc_id = version.document_id
+
+        # Перевіряємо чи це поточна версія документа
+        doc = (await self.db.execute(
+            select(KnowledgeDocument).where(KnowledgeDocument.id == doc_id)
+        )).scalar_one_or_none()
+
+        await self.db.delete(version)
+        await self.db.flush()
+
+        # Якщо видалена версія була поточною — ставимо найновішу з тих що лишились
+        if doc and str(doc.current_version_id) == str(version_id):
+            latest = (await self.db.execute(
+                select(KnowledgeVersion)
+                .where(KnowledgeVersion.document_id == doc_id)
+                .order_by(KnowledgeVersion.created_at.desc())
+                .limit(1)
+            )).scalar_one_or_none()
+
+            doc.current_version_id = latest.id if latest else None
+
+        await self.db.commit()
+        return True
 
     # 🔒 Перевірка доступу для ролі
     async def has_access(

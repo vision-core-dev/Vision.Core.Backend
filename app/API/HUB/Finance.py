@@ -531,7 +531,7 @@ async def get_unwithdrawn_list(
 
 
 @finance_router.get("/GetLeaderboard")
-async def get_leaderboard(db: AsyncSession = Depends(getdb)):
+async def get_leaderboard(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
     """Get ranked list of users by total earnings."""
     # Sum all INCOME and TRANSFER transactions for each user using conditional aggregation
     total_earnings_expr = func.coalesce(
@@ -558,7 +558,9 @@ async def get_leaderboard(db: AsyncSession = Depends(getdb)):
             total_earnings_expr.label("total_earnings")
         )
         .outerjoin(Transaction, Transaction.user_id == User.id)
+        .where(User.is_active == True)
         .group_by(User.id)
+        .having((total_earnings_expr > 0) | (User.id == user.id))
         .order_by(total_earnings_expr.desc())
     )
 

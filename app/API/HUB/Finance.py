@@ -5,7 +5,7 @@ from datetime import datetime
 import pytz
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.Infrastructure.Database import getdb
@@ -528,3 +528,48 @@ async def get_unwithdrawn_list(
     await db.commit()
 
     return {"items": response}
+
+
+@finance_router.get("/GetLeaderboard")
+async def get_leaderboard(db: AsyncSession = Depends(getdb)):
+    """Get ranked list of users by total earnings."""
+    # Sum all INCOME and TRANSFER transactions for each user using conditional aggregation
+    total_earnings_expr = func.coalesce(
+        func.sum(
+            case(
+                (
+                    (Transaction.is_removed == False) & 
+                    Transaction.type.in_([TransactionType.INCOME, TransactionType.TRANSFER]) &
+                    (func.date_trunc("month", Transaction.transaction_at) == func.date_trunc("month", datetime.utcnow())),
+                    Transaction.amount
+                ),
+                else_=0.0
+            )
+        ),
+        0.0
+    )
+
+    result = await db.execute(
+        select(
+            User.id,
+            User.first_name,
+            User.last_name,
+            User.avatar_url,
+            total_earnings_expr.label("total_earnings")
+        )
+        .outerjoin(Transaction, Transaction.user_id == User.id)
+        .group_by(User.id)
+        .order_by(total_earnings_expr.desc())
+    )
+
+    items = []
+    for row in result.all():
+        items.append({
+            "user_id": str(row.id),
+            "first_name": row.first_name,
+            "last_name": row.last_name,
+            "avatar_url": row.avatar_url,
+            "total_earnings": float(row.total_earnings)
+        })
+
+    return {"items": items}

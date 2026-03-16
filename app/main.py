@@ -19,8 +19,8 @@ async def lifespan(app: FastAPI):
     try:
         app.state.redis = await connect_redis()
 
-        # async with engine.begin() as conn:
-        #     await conn.run_sync(Base.metadata.create_all)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
         # await CurrencyService().RefreshExchangeRate(redis=app.state.redis, currency_code="UAH")
         

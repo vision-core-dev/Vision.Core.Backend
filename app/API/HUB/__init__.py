@@ -55,3 +55,6 @@ hub_router.include_router(chat_ws_router)
 
 from .Search import search_router
 hub_router.include_router(search_router)
+
+from .News import news_router
+hub_router.include_router(news_router)

@@ -23,7 +23,62 @@ async def _upload_to_bunny(path: str, data: bytes, content_type: str) -> str:
     if resp.status_code >= 400:
         raise HTTPException(status_code=500, detail=f"upload_failed ({resp.status_code})")
 
-    # повертаємо URL, доступну для Pull Zone
+# повертаємо URL, доступну для Pull Zone
+    return f"https://{pull}/{path}"
+
+
+from fastapi import UploadFile
+
+# Global progress tracker (in-memory for now, Redis would be better for multi-worker)
+UPLOAD_PROGRESS = {}
+
+async def _upload_stream_to_bunny(path: str, file: UploadFile, content_type: str, upload_id: str = None) -> str:
+    """Stream an upload to BunnyCDN and report progress if upload_id is provided."""
+    import httpx
+    from os import getenv
+
+    api_key = getenv("BUNNY_STORAGE_API_KEY")
+    zone = getenv("BUNNY_STORAGE_ZONE")
+    region = getenv("BUNNY_STORAGE_REGION", "storage.bunnycdn.com")
+    pull = getenv("BUNNY_PULL_ZONE_HOSTNAME")
+
+    if not api_key or not zone or not pull:
+        raise HTTPException(status_code=500, detail="bunnycdn_not_configured")
+
+    total_size = file.size or 0
+    url = f"https://{region}/{zone}/{path}"
+    headers = {
+        "AccessKey": api_key,
+        "Content-Type": content_type,
+        "Content-Length": str(total_size)
+    }
+
+    async def file_streamer():
+        await file.seek(0)
+        chunk_size = 1024 * 1024 * 4  # 4 MB chunks
+        sent_bytes = 0
+        while True:
+            chunk = await file.read(chunk_size)
+            if not chunk:
+                break
+            yield chunk
+            sent_bytes += len(chunk)
+            if upload_id and total_size > 0:
+                UPLOAD_PROGRESS[upload_id] = int((sent_bytes / total_size) * 100)
+
+    try:
+        if upload_id:
+            UPLOAD_PROGRESS[upload_id] = 0
+            
+        async with httpx.AsyncClient(timeout=None) as client:
+            resp = await client.put(url, headers=headers, content=file_streamer())
+    finally:
+        if upload_id and upload_id in UPLOAD_PROGRESS:
+            del UPLOAD_PROGRESS[upload_id]
+
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=500, detail=f"upload_failed ({resp.status_code})")
+
     return f"https://{pull}/{path}"
 
 

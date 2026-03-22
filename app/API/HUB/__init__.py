@@ -58,3 +58,6 @@ hub_router.include_router(search_router)
 
 from .News import news_router
 hub_router.include_router(news_router)
+
+from .Drive import drive_router
+hub_router.include_router(drive_router)

@@ -90,6 +90,8 @@ class TaskPreview(PydModel):
     has_description: bool = False
     accruals_count: int = 0
     accruals_sum: float = 0
+    created_at: datetime | None = None
+    completed_at: datetime | None = None
 
 class TaskAssigneeBase(PydModel):
     id: uuid.UUID

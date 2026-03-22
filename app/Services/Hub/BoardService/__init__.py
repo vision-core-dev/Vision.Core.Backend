@@ -124,6 +124,8 @@ class BoardService:
                     has_description=bool(t.description and t.description.strip()),
                     accruals_count=len([a for a in (t.accruals or []) if not a.is_removed]),
                     accruals_sum=sum(a.amount for a in (t.accruals or []) if not a.is_removed),
+                    created_at=t.created_at,
+                    completed_at=t.completed_at,
                 )
                 for t in tasks
             ],

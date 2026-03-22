@@ -32,8 +32,8 @@ from fastapi import UploadFile
 # Global progress tracker (in-memory for now, Redis would be better for multi-worker)
 UPLOAD_PROGRESS = {}
 
-async def _upload_stream_to_bunny(path: str, file: UploadFile, content_type: str, upload_id: str = None) -> str:
-    """Stream an upload to BunnyCDN and report progress if upload_id is provided."""
+async def _upload_stream_to_bunny(path: str, temp_file_path: str, content_type: str, upload_id: str = None) -> str:
+    """Stream an upload to BunnyCDN from a local file path and report progress if upload_id is provided."""
     import httpx
     from os import getenv
 
@@ -45,7 +45,10 @@ async def _upload_stream_to_bunny(path: str, file: UploadFile, content_type: str
     if not api_key or not zone or not pull:
         raise HTTPException(status_code=500, detail="bunnycdn_not_configured")
 
-    total_size = file.size or 0
+    import os
+    import asyncio
+    
+    total_size = os.path.getsize(temp_file_path) if os.path.exists(temp_file_path) else 0
     url = f"https://{region}/{zone}/{path}"
     headers = {
         "AccessKey": api_key,
@@ -54,17 +57,17 @@ async def _upload_stream_to_bunny(path: str, file: UploadFile, content_type: str
     }
 
     async def file_streamer():
-        await file.seek(0)
         chunk_size = 1024 * 1024 * 4  # 4 MB chunks
         sent_bytes = 0
-        while True:
-            chunk = await file.read(chunk_size)
-            if not chunk:
-                break
-            yield chunk
-            sent_bytes += len(chunk)
-            if upload_id and total_size > 0:
-                UPLOAD_PROGRESS[upload_id] = int((sent_bytes / total_size) * 100)
+        with open(temp_file_path, "rb") as f:
+            while True:
+                chunk = await asyncio.to_thread(f.read, chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+                sent_bytes += len(chunk)
+                if upload_id and total_size > 0:
+                    UPLOAD_PROGRESS[upload_id] = int((sent_bytes / total_size) * 100)
 
     try:
         if upload_id:

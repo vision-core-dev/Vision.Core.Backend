@@ -1,9 +1,13 @@
 import uuid
+import json
+import tempfile
+import os
+import asyncio
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, BackgroundTasks
-from sqlalchemy import select, delete, or_
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, BackgroundTasks, WebSocket, WebSocketDisconnect
+from sqlalchemy import select, delete, or_, and_, literal_column, text, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.Infrastructure.Database import getdb, async_session
@@ -23,12 +27,9 @@ drive_router = APIRouter(prefix="/Drive", tags=["Drive"])
 
 
 def _can_access(item, user: User) -> bool:
-    """Check if user can access a drive item (folder or file)."""
-    # Owner always has access
+    """Check if user can access a drive item (folder or file). Used for single-item checks."""
     if str(item.owner_id) == str(user.id):
         return True
-
-    # Admins (order <= 1) always have access
     if user.role and user.role.order <= 1:
         return True
 
@@ -39,20 +40,41 @@ def _can_access(item, user: User) -> bool:
     if access == "public":
         return True
     if access == "private":
-        return False  # Already checked owner above
+        return False
     if access == "role":
         allowed = item.allowed_role_ids or []
         return user.role_id in allowed
     return False
 
 
+def _access_filter(model, user: User):
+    """Build a SQL WHERE clause for access control — avoids loading all rows into Python."""
+    if user.role and user.role.order <= 1:
+        return True  # admins see everything; SQLAlchemy treats True as no filter
+
+    conditions = [
+        model.owner_id == user.id,
+        model.access_type == DriveAccessType.public,
+    ]
+    if user.role_id:
+        conditions.append(
+            and_(
+                model.access_type == DriveAccessType.role,
+                model.allowed_role_ids.any(user.role_id),
+            )
+        )
+    return or_(*conditions)
+
+
 @drive_router.get("/List")
 async def list_drive(
     folder_id: Optional[str] = None,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
-    """List folders and files in a directory."""
+    """List folders and files in a directory with pagination."""
     parsed_folder_id = uuid.UUID(folder_id) if folder_id and folder_id != "null" else None
 
     if parsed_folder_id:
@@ -62,34 +84,49 @@ async def list_drive(
         if not _can_access(folder, user):
             raise HTTPException(status_code=403, detail="access_denied")
 
-    # Fetch folders
-    q_folders = select(DriveFolder).where(DriveFolder.parent_id == parsed_folder_id).order_by(DriveFolder.name)
+    # Fetch folders (access-filtered in SQL)
+    access = _access_filter(DriveFolder, user)
+    q_folders = select(DriveFolder).where(
+        DriveFolder.parent_id == parsed_folder_id,
+    ).order_by(DriveFolder.name)
+    if access is not True:
+        q_folders = q_folders.where(access)
     res_folders = await db.execute(q_folders)
-    folders = [f for f in res_folders.scalars().all() if _can_access(f, user)]
+    folders = res_folders.scalars().all()
 
-    # Fetch files
+    # Fetch files (access-filtered in SQL, with pagination)
+    access_f = _access_filter(DriveFile, user)
     q_files = select(DriveFile).where(
         DriveFile.folder_id == parsed_folder_id,
         DriveFile.task_attachment_id == None,
-    ).order_by(DriveFile.name)
+    ).order_by(DriveFile.name).limit(limit).offset(offset)
+    if access_f is not True:
+        q_files = q_files.where(access_f)
     res_files = await db.execute(q_files)
-    files = [f for f in res_files.scalars().all() if _can_access(f, user)]
+    files = res_files.scalars().all()
 
-    # Breadcrumbs
+    # Breadcrumbs via recursive CTE (single query instead of N+1)
     breadcrumbs = []
+    current_folder = None
     if parsed_folder_id:
-        curr = await db.get(DriveFolder, parsed_folder_id)
-        while curr:
-            breadcrumbs.insert(0, curr)
-            if curr.parent_id:
-                curr = await db.get(DriveFolder, curr.parent_id)
-            else:
-                curr = None
+        cte = (
+            select(DriveFolder)
+            .where(DriveFolder.id == parsed_folder_id)
+            .cte(name="breadcrumb_cte", recursive=True)
+        )
+        cte = cte.union_all(
+            select(DriveFolder).join(cte, DriveFolder.id == cte.c.parent_id)
+        )
+        bc_query = select(DriveFolder).join(cte, DriveFolder.id == cte.c.id).order_by(DriveFolder.created_at)
+        bc_result = await db.execute(bc_query)
+        breadcrumbs = list(bc_result.scalars().all())
+        # current_folder is the last breadcrumb (the folder we're viewing)
+        current_folder = breadcrumbs[-1] if breadcrumbs else None
 
     return {
         "folders": [DriveFolderPreview.from_orm(f) for f in folders],
         "files": [DriveFilePreview.from_orm(f) for f in files],
-        "current_folder": DriveFolderPreview.from_orm(await db.get(DriveFolder, parsed_folder_id)) if parsed_folder_id else None,
+        "current_folder": DriveFolderPreview.from_orm(current_folder) if current_folder else None,
         "breadcrumbs": [DriveFolderPreview.from_orm(f) for f in breadcrumbs],
     }
 
@@ -132,6 +169,10 @@ async def update_folder(
     if "name" in data: folder.name = data["name"]
     if "access_type" in data: folder.access_type = data["access_type"]
     if "allowed_role_ids" in data: folder.allowed_role_ids = [uuid.UUID(r) for r in data["allowed_role_ids"]]
+    
+    if "parent_id" in data:
+        p_id = data["parent_id"]
+        folder.parent_id = uuid.UUID(p_id) if p_id and str(p_id).lower() != "null" else None
 
     await db.commit()
     return DriveFolderPreview.from_orm(folder)
@@ -247,6 +288,83 @@ async def upload_file(
     return {"status": "processing", "upload_id": upload_id}
 
 
+@drive_router.websocket("/Files/UploadWS")
+async def upload_file_ws(websocket: WebSocket, db: AsyncSession = Depends(getdb)):
+    """WebSocket endpoint for large file uploads to bypass cloudflare timeouts."""
+    from app.Services.Hub.AuthService.depends import _get_user_by_token
+    await websocket.accept()
+    
+    try:
+        # 1. First message must be JSON config with token
+        auth_msg_raw = await websocket.receive_text()
+        auth_msg = json.loads(auth_msg_raw)
+        
+        token_str = auth_msg.get("token")
+        if not token_str:
+            await websocket.close(code=1008)
+            return
+            
+        try:
+            user = await _get_user_by_token(db, uuid.UUID(token_str))
+        except Exception:
+            await websocket.close(code=1008)
+            return
+            
+        folder_id = auth_msg.get("folder_id")
+        parsed_folder_id = uuid.UUID(folder_id) if folder_id and folder_id != "null" and folder_id != "" else None
+
+        if parsed_folder_id:
+            folder = await db.get(DriveFolder, parsed_folder_id)
+            if not folder or not _can_access(folder, user):
+                await websocket.close(code=1008)
+                return
+
+        # Tell client we are ready
+        await websocket.send_json({"status": "ready"})
+        
+        # 2. Receive binary chunks into a temporary file
+        fd, temp_path = tempfile.mkstemp()
+        
+        with os.fdopen(fd, "wb") as f:
+            while True:
+                msg = await websocket.receive()
+                if "bytes" in msg:
+                    await asyncio.to_thread(f.write, msg["bytes"])
+                elif "text" in msg:
+                    data = json.loads(msg["text"])
+                    if data.get("type") == "eof":
+                        break
+        
+        # 3. File is fully received, spawn background processing task
+        parsed_role_ids = []
+        if auth_msg.get("allowed_role_ids"):
+            parsed_role_ids = [uuid.UUID(r) for r in auth_msg.get("allowed_role_ids")]
+            
+        asyncio.create_task(
+            process_file_upload(
+                temp_path,
+                auth_msg.get("filename", "unnamed_file"),
+                auth_msg.get("content_type", "application/octet-stream"),
+                os.path.getsize(temp_path),
+                parsed_folder_id,
+                user.id,
+                DriveAccessType(auth_msg.get("access_type", "public")),
+                parsed_role_ids,
+                auth_msg.get("upload_id")
+            )
+        )
+        await websocket.send_json({"status": "success", "message": "File received. Processing."})
+        await websocket.close(code=1000)
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        print("WS Upload Error: ", e)
+        try:
+            await websocket.close(code=1011)
+        except Exception:
+            pass
+
+
 @drive_router.get("/Files/UploadStatus/{upload_id}")
 async def get_upload_status(upload_id: str):
     """Get the progress of an ongoing upload stream (Server -> Bunny)."""
@@ -273,6 +391,10 @@ async def update_file(
     if "name" in data: d_file.name = data["name"]
     if "access_type" in data: d_file.access_type = data["access_type"]
     if "allowed_role_ids" in data: d_file.allowed_role_ids = [uuid.UUID(r) for r in data["allowed_role_ids"]]
+
+    if "folder_id" in data:
+        f_id = data["folder_id"]
+        d_file.folder_id = uuid.UUID(f_id) if f_id and str(f_id).lower() != "null" else None
 
     await db.commit()
     return DriveFilePreview.from_orm(d_file)
@@ -302,16 +424,20 @@ async def delete_file(
 @drive_router.get("/TaskDisk")
 async def task_disk(
     board_id: Optional[str] = None,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
-    """Virtual view of task attachments."""
+    """Virtual view of task attachments with pagination."""
     from sqlalchemy.orm import selectinload
     q = select(TaskAttachment).options(
         selectinload(TaskAttachment.task).selectinload(Task.board)
     )
     if board_id:
         q = q.join(Task).join(Board).where(Board.id == uuid.UUID(board_id))
+
+    q = q.order_by(TaskAttachment.created_at.desc()).limit(limit).offset(offset)
 
     res = await db.execute(q)
     attachments = res.scalars().all()
@@ -322,8 +448,11 @@ async def task_disk(
                 "id": str(a.id),
                 "name": a.name or a.url.split("/")[-1],
                 "url": a.url,
+                "task_id": str(a.task_id) if a.task_id else None,
+                "task_name": a.task.name if a.task else "Unknown",
+                "board_id": str(a.task.board_id) if a.task and a.task.board_id else None,
+                "board_name": a.task.board.name if a.task and a.task.board else "Unknown",
                 "created_at": a.created_at,
-                "board_name": a.task.board.name if a.task and a.task.board else "Unknown"
             }
             for a in attachments
         ]
@@ -333,18 +462,34 @@ async def task_disk(
 @drive_router.get("/Search")
 async def search_drive(
     q: str,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
-    """Search for files and folders."""
-    q_folders = select(DriveFolder).where(DriveFolder.name.ilike(f"%{q}%"))
-    q_files = select(DriveFile).where(DriveFile.name.ilike(f"%{q}%"))
+    """Search for files and folders with pagination and SQL-level access check."""
+    # Escape special SQL LIKE characters to prevent injection
+    safe_q = q.replace("%", "\\%").replace("_", "\\_")
+
+    # Folders
+    q_folders = select(DriveFolder).where(DriveFolder.name.ilike(f"%{safe_q}%"))
+    access_fold = _access_filter(DriveFolder, user)
+    if access_fold is not True:
+        q_folders = q_folders.where(access_fold)
+    q_folders = q_folders.order_by(DriveFolder.name).limit(limit).offset(offset)
+
+    # Files
+    q_files = select(DriveFile).where(DriveFile.name.ilike(f"%{safe_q}%"))
+    access_file = _access_filter(DriveFile, user)
+    if access_file is not True:
+        q_files = q_files.where(access_file)
+    q_files = q_files.order_by(DriveFile.name).limit(limit).offset(offset)
 
     res_folders = await db.execute(q_folders)
     res_files = await db.execute(q_files)
 
-    folders = [f for f in res_folders.scalars().all() if _can_access(f, user)]
-    files = [f for f in res_files.scalars().all() if _can_access(f, user)]
+    folders = res_folders.scalars().all()
+    files = res_files.scalars().all()
 
     return {
         "folders": [DriveFolderPreview.from_orm(f) for f in folders],

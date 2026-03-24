@@ -48,14 +48,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://hub.vcore.dev",
-        "http://localhost:3000",
-        "http://localhost:8000",
         "http://localhost:5173",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
+    expose_headers=["Content-Disposition", "Content-Length", "X-Request-Id"],
 )
 
 app.include_router(api_router)

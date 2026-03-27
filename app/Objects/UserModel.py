@@ -99,7 +99,17 @@ class MyUserRoleBase(PydModel):
     menu: list[str]
     order: int
 
+class UserRoleCreate(PydModel):
+    key: str
+    name: str
+    menu: list[str] = []
+    order: int = 0
 
+class UserRoleUpdate(PydModel):
+    key: Optional[str] = None
+    name: Optional[str] = None
+    menu: Optional[list[str]] = None
+    order: Optional[int] = None
 class UserShort(PydModel):
     id: uuid.UUID
     first_name: str

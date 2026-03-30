@@ -319,13 +319,24 @@ async def upload_file_ws(websocket: WebSocket, db: AsyncSession = Depends(getdb)
                 await websocket.close(code=1008)
                 return
 
-        # Tell client we are ready
-        await websocket.send_json({"status": "ready"})
+        # We need an upload_id to handle resume.
+        upload_id = auth_msg.get("upload_id")
+        if not upload_id:
+            upload_id = str(uuid.uuid4())
+
+        TEMP_DIR = os.path.join(tempfile.gettempdir(), "visioncore_uploads")
+        os.makedirs(TEMP_DIR, exist_ok=True)
+        temp_path = os.path.join(TEMP_DIR, f"{upload_id}.tmp")
+
+        current_offset = 0
+        if os.path.exists(temp_path):
+            current_offset = os.path.getsize(temp_path)
+
+        # Tell client we are ready with the current byte offset
+        await websocket.send_json({"status": "ready", "offset": current_offset})
         
-        # 2. Receive binary chunks into a temporary file
-        fd, temp_path = tempfile.mkstemp()
-        
-        with os.fdopen(fd, "wb") as f:
+        # 2. Receive binary chunks into the temporary file
+        with open(temp_path, "ab" if current_offset > 0 else "wb") as f:
             while True:
                 msg = await websocket.receive()
                 if "bytes" in msg:

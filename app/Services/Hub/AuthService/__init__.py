@@ -9,7 +9,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.Objects.UserModel import User, MeUserBase, UserRole, MyUserRoleBase
 from app.Services.Hub.AuthService.contracts import LoginResponse, CheckMeResponse, RegisterUserResponse
+from app.Services.Hub.AuthService.oauth import OAuthUserInfo
 from app.Services.Hub.AuthService.utils import get_hashed_password, check_password
+
+PROVIDER_ID_FIELD = {
+    "google": "google_id",
+    "discord": "discord_id",
+    "telegram": "telegram_id",
+    "roblox": "roblox_id",
+}
+
+PROVIDER_USERNAME_FIELD = {
+    "google": "google_email",
+    "discord": "discord_username",
+    "telegram": "telegram_username",
+    "roblox": "roblox_username",
+}
 
 
 class AuthService:
@@ -104,6 +119,75 @@ class AuthService:
         await self.db.refresh(new_user)
 
         return RegisterUserResponse(user_id=new_user.id, email=email, password=password)
+
+    async def OAuthLogin(self, info: OAuthUserInfo) -> LoginResponse:
+        id_field = PROVIDER_ID_FIELD[info.provider]
+
+        result = await self.db.execute(
+            select(User).where(getattr(User, id_field) == info.provider_id)
+        )
+        user = result.scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(status_code=400, detail="oauth_account_not_linked")
+
+        if not user.is_active:
+            raise HTTPException(status_code=400, detail="user_is_deactivated")
+
+        if not user.role_id:
+            default_role_result = await self.db.execute(
+                select(UserRole).where(UserRole.key == "default")
+            )
+            default_role = default_role_result.scalar_one_or_none()
+            if not default_role:
+                raise HTTPException(status_code=500, detail="default_role_not_found")
+            user.role_id = str(default_role.id)
+
+        user.last_login = func.now()
+        await self.db.commit()
+        await self.db.refresh(user)
+
+        return LoginResponse(token=str(user.temp_token))
+
+    async def LinkOAuth(self, user: User, info: OAuthUserInfo) -> dict:
+        id_field = PROVIDER_ID_FIELD[info.provider]
+        username_field = PROVIDER_USERNAME_FIELD[info.provider]
+
+        existing = await self.db.execute(
+            select(User).where(getattr(User, id_field) == info.provider_id)
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="oauth_account_already_used")
+
+        setattr(user, id_field, info.provider_id)
+        setattr(user, username_field, info.username or info.email)
+
+        await self.db.commit()
+        await self.db.refresh(user)
+
+        return {
+            "provider": info.provider,
+            "provider_id": info.provider_id,
+            "username": info.username or info.email,
+        }
+
+    async def UnlinkOAuth(self, user: User, provider: str) -> dict:
+        if provider not in PROVIDER_ID_FIELD:
+            raise HTTPException(status_code=400, detail="invalid_provider")
+
+        id_field = PROVIDER_ID_FIELD[provider]
+        username_field = PROVIDER_USERNAME_FIELD[provider]
+
+        if not getattr(user, id_field):
+            raise HTTPException(status_code=400, detail="provider_not_linked")
+
+        setattr(user, id_field, None)
+        setattr(user, username_field, None)
+
+        await self.db.commit()
+        await self.db.refresh(user)
+
+        return {"provider": provider, "unlinked": True}
 
     async def AcceptOffer(self, user: User) -> None:
         if not user:

@@ -55,6 +55,16 @@ class User(Base):
     avatar_url = Column(String(255), nullable=True)
     birthday = Column(DateTime(timezone=True), nullable=True)
 
+    # OAuth linked accounts
+    google_id = Column(String(100), unique=True, nullable=True)
+    google_email = Column(String(255), nullable=True)
+    discord_id = Column(String(100), unique=True, nullable=True)
+    discord_username = Column(String(255), nullable=True)
+    telegram_id = Column(String(100), unique=True, nullable=True)
+    telegram_username = Column(String(255), nullable=True)
+    roblox_id = Column(String(100), unique=True, nullable=True)
+    roblox_username = Column(String(255), nullable=True)
+
     # Session / identity
     temp_token = Column(UUID(as_uuid=True), unique=True, nullable=True)
     last_login = Column(DateTime(timezone=True), nullable=True)
@@ -157,3 +167,11 @@ class MeUserBase(PydModel):
     is_terms_accepted: bool
     terms_accepted_at: Optional[datetime]
     is_active: bool
+    google_id: Optional[str] = None
+    google_email: Optional[str] = None
+    discord_id: Optional[str] = None
+    discord_username: Optional[str] = None
+    telegram_id: Optional[str] = None
+    telegram_username: Optional[str] = None
+    roblox_id: Optional[str] = None
+    roblox_username: Optional[str] = None

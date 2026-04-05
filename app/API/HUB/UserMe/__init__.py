@@ -25,3 +25,6 @@ user_me_router.include_router(my_profile_router)
 
 from .MyTasks import my_tasks_router
 user_me_router.include_router(my_tasks_router)
+
+from .LinkedAccounts import linked_accounts_router
+user_me_router.include_router(linked_accounts_router)

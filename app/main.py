@@ -48,6 +48,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://hub.vcore.dev",
+        "https://hub.visioncore.dev",
         "http://localhost:5173",
     ],
     allow_credentials=True,

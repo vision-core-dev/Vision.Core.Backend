@@ -20,6 +20,19 @@ class RegisterUserResponse(BaseModel):
     email: str
     password: str
 
+class OAuthCodeRequest(BaseModel):
+    code: str
+    redirect_uri: str
+
+class TelegramAuthRequest(BaseModel):
+    id: int
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    username: Optional[str] = None
+    photo_url: Optional[str] = None
+    auth_date: int
+    hash: str
+
 class CheckMeResponse(BaseModel):
     user: MeUserBase
     role: MyUserRoleBase

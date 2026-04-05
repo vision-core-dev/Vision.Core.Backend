@@ -65,6 +65,10 @@ class User(Base):
     roblox_id = Column(String(100), unique=True, nullable=True)
     roblox_username = Column(String(255), nullable=True)
 
+    # Notification preferences
+    notify_discord = Column(Boolean, nullable=False, server_default=sql.expression.false())
+    notify_telegram = Column(Boolean, nullable=False, server_default=sql.expression.false())
+
     # Session / identity
     temp_token = Column(UUID(as_uuid=True), unique=True, nullable=True)
     last_login = Column(DateTime(timezone=True), nullable=True)
@@ -167,6 +171,8 @@ class MeUserBase(PydModel):
     is_terms_accepted: bool
     terms_accepted_at: Optional[datetime]
     is_active: bool
+    notify_discord: bool = False
+    notify_telegram: bool = False
     google_id: Optional[str] = None
     google_email: Optional[str] = None
     discord_id: Optional[str] = None

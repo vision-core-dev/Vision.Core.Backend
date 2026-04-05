@@ -89,3 +89,34 @@ async def upload_avatar(
     return {
         "avatar_url": file_url,
     }
+
+
+class UpdateNotifySettingsRequest(BaseModel):
+    notify_discord: bool | None = None
+    notify_telegram: bool | None = None
+
+
+@my_profile_router.post("/UpdateNotifySettings", status_code=200)
+async def update_notify_settings(
+    data: UpdateNotifySettingsRequest,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb),
+):
+    if data.notify_discord is not None:
+        if data.notify_discord and not user.discord_id:
+            raise HTTPException(status_code=400, detail="discord_not_linked")
+        user.notify_discord = data.notify_discord
+
+    if data.notify_telegram is not None:
+        if data.notify_telegram and not user.telegram_id:
+            raise HTTPException(status_code=400, detail="telegram_not_linked")
+        user.notify_telegram = data.notify_telegram
+
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    return {
+        "notify_discord": user.notify_discord,
+        "notify_telegram": user.notify_telegram,
+    }

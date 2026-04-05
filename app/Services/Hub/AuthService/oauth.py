@@ -13,6 +13,7 @@ class OAuthUserInfo(BaseModel):
     provider_id: str
     username: Optional[str] = None
     email: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
@@ -71,15 +72,23 @@ async def get_discord_user(code: str, redirect_uri: str) -> OAuthUserInfo:
         user_res.raise_for_status()
         data = user_res.json()
 
+    avatar_url = None
+    if data.get("avatar"):
+        avatar_url = f"https://cdn.discordapp.com/avatars/{data['id']}/{data['avatar']}.png?size=512"
+
     return OAuthUserInfo(
         provider="discord",
         provider_id=str(data["id"]),
         username=data.get("username"),
         email=data.get("email"),
+        avatar_url=avatar_url,
     )
 
 
 def verify_telegram_auth(auth_data: dict) -> OAuthUserInfo:
+    # Filter out None values — Telegram only includes present fields in hash
+    auth_data = {k: v for k, v in auth_data.items() if v is not None}
+
     check_hash = auth_data.pop("hash", None)
     if not check_hash:
         raise ValueError("missing_hash")

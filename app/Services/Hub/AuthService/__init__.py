@@ -1,12 +1,14 @@
 import uuid
 from datetime import datetime
 
+import httpx
 import pytz
 from fastapi import HTTPException
 from pydantic import EmailStr
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.Infrastructure.Storage import _upload_to_bunny
 from app.Objects.UserModel import User, MeUserBase, UserRole, MyUserRoleBase
 from app.Services.Hub.AuthService.contracts import LoginResponse, CheckMeResponse, RegisterUserResponse
 from app.Services.Hub.AuthService.oauth import OAuthUserInfo
@@ -120,6 +122,22 @@ class AuthService:
 
         return RegisterUserResponse(user_id=new_user.id, email=email, password=password)
 
+    async def _sync_avatar_from_oauth(self, user: User, info: OAuthUserInfo) -> None:
+        if user.avatar_url or not info.avatar_url:
+            return
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.get(info.avatar_url)
+                if res.status_code != 200:
+                    return
+                content_type = res.headers.get("content-type", "image/png")
+                ext = "png" if "png" in content_type else "jpg"
+                path = f"avatars/{user.id}_{uuid.uuid4()}.{ext}"
+                file_url = await _upload_to_bunny(path, res.content, content_type)
+                user.avatar_url = file_url
+        except Exception:
+            pass
+
     async def OAuthLogin(self, info: OAuthUserInfo) -> LoginResponse:
         id_field = PROVIDER_ID_FIELD[info.provider]
 
@@ -143,6 +161,8 @@ class AuthService:
                 raise HTTPException(status_code=500, detail="default_role_not_found")
             user.role_id = str(default_role.id)
 
+        await self._sync_avatar_from_oauth(user, info)
+
         user.last_login = func.now()
         await self.db.commit()
         await self.db.refresh(user)
@@ -161,6 +181,8 @@ class AuthService:
 
         setattr(user, id_field, info.provider_id)
         setattr(user, username_field, info.username or info.email)
+
+        await self._sync_avatar_from_oauth(user, info)
 
         await self.db.commit()
         await self.db.refresh(user)

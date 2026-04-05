@@ -17,12 +17,14 @@ from app.Objects.finance.TaskAccrualModel import TaskAccrual
 from app.Services.Hub.TaskService.contracts import (
     TaskDetailsResponse, UserPreview, TagPreview, AttachmentPreview, CommentPreview, AccrualPreview
 )
+from app.Services.Hub.NotifyService import NotifyService
 from app.Services.LogService import LogService
 
 
 class TaskService:
     def __init__(self, db):
         self.db = db
+        self._notify = NotifyService(db)
 
     async def GetTaskDetails(self, task_id: uuid.UUID, user: User) -> TaskDetailsResponse:
         # 🔹 1. Отримуємо задачу
@@ -332,8 +334,18 @@ class TaskService:
         await self.db.execute(
             update(Task).where(Task.id == task_id).values(assignee_ids=new_assignees)
         )
+
+        # Сповіщення призначеному
+        if not current_user or user_id != current_user.id:
+            await self._notify.CreateNotification(
+                user_id=user_id,
+                title="Призначення на задачу",
+                message=f"Вас призначено на задачу <b>{task.name}</b>",
+                link=f"/boards/b/{task.board_id}/t/{task_id}",
+            )
+
         await self.db.commit()
-        
+
         # Логування
         await LogService.log_action(
             db=self.db,
@@ -349,7 +361,7 @@ class TaskService:
                 "new_assignees": [str(uid) for uid in new_assignees],
             }
         )
-        
+
         return {"ok": True, "board_id": str(task.board_id)}
 
     # ❌ Зняти користувача
@@ -366,6 +378,14 @@ class TaskService:
         await self.db.execute(
             update(Task).where(Task.id == task_id).values(assignee_ids=list(current_ids))
         )
+
+        await self._notify.CreateNotification(
+            user_id=user_id,
+            title="Зняття з задачі",
+            message=f"Вас знято з задачі <b>{task.name}</b>",
+            link=f"/boards/b/{task.board_id}/t/{task_id}",
+        )
+
         await self.db.commit()
         return {"ok": True, "board_id": str(task.board_id)}
 
@@ -715,6 +735,8 @@ class TaskService:
         deadline_at_dt = parse_date(deadline_at)
         completed_at_dt = parse_date(completed_at)
 
+        old_deadline = task.deadline_at
+
         # 🧮 Оновлюємо дати
         if started_at_dt is not None:
             task.started_at = started_at_dt
@@ -722,6 +744,17 @@ class TaskService:
             task.deadline_at = deadline_at_dt
         if completed_at_dt is not None:
             task.completed_at = completed_at_dt
+
+        # Сповіщення про зміну дедлайну
+        if deadline_at_dt and deadline_at_dt != old_deadline and task.assignee_ids:
+            dl = deadline_at_dt.strftime("%d.%m.%Y %H:%M")
+            for uid in task.assignee_ids:
+                await self._notify.CreateNotification(
+                    user_id=uid,
+                    title="Зміна дедлайну",
+                    message=f"Дедлайн задачі <b>{task.name}</b> змінено на {dl}",
+                    link=f"/boards/b/{task.board_id}/t/{task.id}",
+                )
 
         await self.db.commit()
 
@@ -814,6 +847,16 @@ class TaskService:
         if all_done:
             task.status = TaskStatus.done
             task.completed_at = func.now()
+
+            # Сповіщення про завершення задачі
+            if task.assignee_ids:
+                for uid in task.assignee_ids:
+                    await self._notify.CreateNotification(
+                        user_id=uid,
+                        title="Задачу завершено",
+                        message=f"Усі підзадачі <b>{task.name}</b> виконано ✅",
+                        link=f"/boards/b/{task.board_id}/t/{task.id}",
+                    )
         else:
             # Якщо хоча б одна не виконана, повертаємо в in_progress
             task.status = TaskStatus.in_progress

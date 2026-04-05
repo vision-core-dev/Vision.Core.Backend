@@ -271,6 +271,15 @@ async def create_task_accrual(
     # 3. Update user balance
     target_user.balance = (target_user.balance or 0.0) + float(payload.amount)
 
+    # 4. Notify user about accrual
+    from app.Services.Hub.NotifyService import NotifyService
+    await NotifyService(db).CreateNotification(
+        user_id=target_user.id,
+        title="Нарахування",
+        message=f"Вам нараховано <b>{payload.amount} UAH</b> — {accrual_name}",
+        link=f"/boards/b/{task.board_id}/t/{task_id}",
+    )
+
     await db.commit()
     await db.refresh(accrual)
 

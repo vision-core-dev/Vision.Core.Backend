@@ -267,8 +267,25 @@ class EventService:
         if not event:
             raise HTTPException(status_code=404, detail="event_not_found")
 
-        for field, value in data.model_dump(exclude_none=True).items():
+        changes = data.model_dump(exclude_none=True)
+        time_changed = any(k in changes for k in ("date", "time_from", "time_to"))
+
+        for field, value in changes.items():
             setattr(event, field, value)
+
+        # Сповіщення учасникам якщо змінився час/дата
+        if time_changed:
+            invites_result = await self.db.execute(
+                select(EventInvite).where(EventInvite.event_id == event.id)
+            )
+            notify = NotifyService(self.db)
+            for invite in invites_result.scalars().all():
+                await notify.CreateNotification(
+                    user_id=invite.user_id,
+                    title="Зміна часу події",
+                    message=f"Час події <b>{event.name}</b> було змінено",
+                    link=f"/calendar/e/{event.id}",
+                )
 
         await self.db.commit()
         return GenericSuccessResponse()

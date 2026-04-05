@@ -15,8 +15,17 @@ from app.Objects.finance.WithdrawalLimitModel import WithdrawalLimitModel
 from app.Objects.finance.WithdrawalRequestModel import WithdrawalRequest, WithdrawalRequestStatus
 from app.Objects.tasks.TaskModel import Task
 from app.Services.Hub.AuthService.depends import getuser
+from app.Services.Hub.NotifyService import NotifyService
 
 finance_router = APIRouter(prefix="/Finance", tags=["Hub > Finance"])
+
+TRANSACTION_TYPE_LABEL = {
+    TransactionType.INCOME: ("Надходження", "💰"),
+    TransactionType.EXPENSE: ("Витрати", "💸"),
+    TransactionType.TRANSFER: ("Переказ", "🔄"),
+    TransactionType.WITHDRAWAL: ("Виведення", "🏦"),
+    TransactionType.DEDUCTION: ("Корегування", "📝"),
+}
 
 
 @finance_router.get("/GetRealTimeBalance")
@@ -315,6 +324,22 @@ async def create_transaction(
             target_user.withdrawn_amount = (target_user.withdrawn_amount or 0.0) + (-data.amount)
         db.add(target_user)
 
+    # Сповіщення
+    notify = NotifyService(db)
+    for user_id in data.users or []:
+        target_res = await db.execute(select(User).where(User.id == user_id))
+        tu = target_res.scalar_one_or_none()
+        if not tu:
+            continue
+        label, emoji = TRANSACTION_TYPE_LABEL.get(data.type, ("Транзакція", "📋"))
+        new_balance = tu.balance or 0.0
+        await notify.CreateNotification(
+            user_id=user_id,
+            title=f"{emoji} {label}",
+            message=f"<b>{data.name}</b> — {data.amount:.2f} ₴\nБаланс: {new_balance:.2f} ₴",
+            link="/finance/transactions/list",
+        )
+
     # Один комміт для всіх
     await db.commit()
 
@@ -393,6 +418,17 @@ async def delete_transaction(
             target_user.withdrawn_amount = (target_user.withdrawn_amount or 0.0) - (-float(tx.amount))
 
     tx.is_removed = True
+
+    if target_user:
+        label, _ = TRANSACTION_TYPE_LABEL.get(tx.type, ("Транзакція", "📋"))
+        new_balance = target_user.balance or 0.0
+        await NotifyService(db).CreateNotification(
+            user_id=target_user.id,
+            title="🗑️ Скасування транзакції",
+            message=f"<b>{tx.name}</b> ({label}, {tx.amount:.2f} ₴) скасовано\nБаланс: {new_balance:.2f} ₴",
+            link="/finance/transactions/list",
+        )
+
     await db.commit()
 
     return {

@@ -339,7 +339,7 @@ class TaskService:
         if not current_user or user_id != current_user.id:
             await self._notify.CreateNotification(
                 user_id=user_id,
-                title="Призначення на задачу",
+                title="👤 Призначення на задачу",
                 message=f"Вас призначено на задачу <b>{task.name}</b>",
                 link=f"/boards/b/{task.board_id}/t/{task_id}",
             )
@@ -381,7 +381,7 @@ class TaskService:
 
         await self._notify.CreateNotification(
             user_id=user_id,
-            title="Зняття з задачі",
+            title="🚫 Зняття з задачі",
             message=f"Вас знято з задачі <b>{task.name}</b>",
             link=f"/boards/b/{task.board_id}/t/{task_id}",
         )
@@ -751,7 +751,7 @@ class TaskService:
             for uid in task.assignee_ids:
                 await self._notify.CreateNotification(
                     user_id=uid,
-                    title="Зміна дедлайну",
+                    title="📅 Зміна дедлайну",
                     message=f"Дедлайн задачі <b>{task.name}</b> змінено на {dl}",
                     link=f"/boards/b/{task.board_id}/t/{task.id}",
                 )
@@ -853,8 +853,8 @@ class TaskService:
                 for uid in task.assignee_ids:
                     await self._notify.CreateNotification(
                         user_id=uid,
-                        title="Задачу завершено",
-                        message=f"Усі підзадачі <b>{task.name}</b> виконано ✅",
+                        title="✅ Задачу завершено",
+                        message=f"Усі підзадачі <b>{task.name}</b> виконано",
                         link=f"/boards/b/{task.board_id}/t/{task.id}",
                     )
         else:

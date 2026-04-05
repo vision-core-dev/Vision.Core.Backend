@@ -19,11 +19,11 @@ async def check_deadline_reminders():
 
         # Windows: 1 day before and 1 hour before
         windows = [
-            ("1 день", now + timedelta(hours=23, minutes=30), now + timedelta(hours=24, minutes=30)),
-            ("1 година", now + timedelta(minutes=30), now + timedelta(hours=1, minutes=30)),
+            ("1 день", "📆", now + timedelta(hours=23, minutes=30), now + timedelta(hours=24, minutes=30)),
+            ("1 година", "⏰", now + timedelta(minutes=30), now + timedelta(hours=1, minutes=30)),
         ]
 
-        for label, window_start, window_end in windows:
+        for label, emoji, window_start, window_end in windows:
             result = await db.execute(
                 select(Task).where(
                     and_(
@@ -49,7 +49,7 @@ async def check_deadline_reminders():
                         select(UserNotify).where(
                             and_(
                                 UserNotify.user_id == uid,
-                                UserNotify.title == f"Дедлайн через {label}",
+                                UserNotify.title == f"{emoji} Дедлайн через {label}",
                                 UserNotify.link == f"/boards/b/{task.board_id}/t/{task.id}",
                             )
                         )
@@ -59,7 +59,7 @@ async def check_deadline_reminders():
 
                     await notify.CreateNotification(
                         user_id=uid,
-                        title=f"Дедлайн через {label}",
+                        title=f"{emoji} Дедлайн через {label}",
                         message=f"Задача <b>{task.name}</b> — дедлайн {dl}",
                         link=f"/boards/b/{task.board_id}/t/{task.id}",
                     )

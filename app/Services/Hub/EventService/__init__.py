@@ -68,7 +68,7 @@ class EventService:
 
             await NotifyService(self.db).CreateNotification(
                 user_id,
-                "Запрошення на подію",
+                "📨 Запрошення на подію",
                 f"Вас запрошено на подію <b>{new_event.name}</b> 🗓️ {date_str} 🕐 {time_from_str}–{time_to_str} у {new_event.location}.",
                 link=f"/calendar/e/{new_event.id}"
             )
@@ -282,7 +282,7 @@ class EventService:
             for invite in invites_result.scalars().all():
                 await notify.CreateNotification(
                     user_id=invite.user_id,
-                    title="Зміна часу події",
+                    title="🕐 Зміна часу події",
                     message=f"Час події <b>{event.name}</b> було змінено",
                     link=f"/calendar/e/{event.id}",
                 )
@@ -343,7 +343,7 @@ class EventService:
 
             await NotifyService(self.db).CreateNotification(
                 user_id,
-                "Запрошення на подію",
+                "📨 Запрошення на подію",
                 f"Вас запрошено на подію <b>{event.name}</b> 🗓️ {date_str} 🕐 {time_from_str}–{time_to_str} у {event.location}.",
                 link=f"/calendar/e/{event.id}"
             )

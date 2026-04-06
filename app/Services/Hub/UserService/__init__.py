@@ -87,6 +87,7 @@ class UserService:
         if actor_role.order <= 2:
             actions.append("give_badge")
             actions.append("remove_badge")
+            actions.append("reset_password")
 
         # 🧑‍💼 Керівники
         supervisors = []

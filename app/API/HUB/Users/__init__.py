@@ -56,6 +56,25 @@ async def reset_user_password(user_id: uuid.UUID, data: ChangeUserPasswordReques
         return HTTPException(status_code=400, detail="no_new_password")
     return await UserService(db).ChangeUserPassword(user_id, data.new_password, user)
 
+@users_router.post("/{user_id}/ResetPassword", dependencies=[Depends(HTTPBearer(auto_error=False))])
+async def admin_reset_password(user_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    import secrets
+    from app.Services.Hub.AuthService.utils import get_hashed_password
+
+    if not user.role or user.role.order > 2:
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    target = await db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="user_not_found")
+
+    new_password = secrets.token_urlsafe(10)
+    target.hashed_password = get_hashed_password(new_password)
+    await db.commit()
+
+    return {"new_password": new_password}
+
+
 @users_router.post("/{user_id}/ChangeRole/{new_role_id}")
 async def change_user_role(user_id: uuid.UUID, new_role_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
     return await UserService(db).ChangeUserRole(user_id, new_role_id, user)

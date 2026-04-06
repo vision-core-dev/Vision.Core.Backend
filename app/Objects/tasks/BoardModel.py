@@ -47,3 +47,7 @@ class BoardPreview(PydModel):
     description: str | None
     banner_url: str | None = None
     created_at: datetime
+    total_tasks: int = 0
+    done_tasks: int = 0
+    overdue_tasks: int = 0
+    due_today_tasks: int = 0

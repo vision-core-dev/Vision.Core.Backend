@@ -141,6 +141,8 @@ class UserPreview(PydModel):
     role_name: str | None = None
     is_active: bool = False
     created_at: datetime | None = None
+    discord_username: str | None = None
+    board_names: list[str] = []
 
 class UserBase(PydModel):
     id: uuid.UUID
@@ -157,6 +159,14 @@ class UserBase(PydModel):
     last_login: datetime | None
     created_at: datetime
     updated_at: datetime | None = None
+    google_id: Optional[str] = None
+    google_email: Optional[str] = None
+    discord_id: Optional[str] = None
+    discord_username: Optional[str] = None
+    telegram_id: Optional[str] = None
+    telegram_username: Optional[str] = None
+    roblox_id: Optional[str] = None
+    roblox_username: Optional[str] = None
 
 class MeUserBase(PydModel):
     id: uuid.UUID

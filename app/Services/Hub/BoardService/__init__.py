@@ -11,7 +11,7 @@ from app.Infrastructure.Storage import _upload_to_bunny, _delete_from_bunny
 from app.Objects.UserModel import User, UserPreview
 from app.Objects.tasks.BoardListModel import BoardList
 from app.Objects.tasks.BoardModel import Board
-from app.Objects.tasks.TaskModel import Task, TaskPreview
+from app.Objects.tasks.TaskModel import Task, TaskPreview, TaskStatus
 from app.Objects.tasks.TaskTags import TaskTag
 from app.Services.Hub.BoardService.contracts import CreateBoardResponse, BoardsListResponse, BoardDetailsResponse
 
@@ -33,6 +33,8 @@ class BoardService:
         return CreateBoardResponse(board_id=new_board.id)
 
     async def GetBoardsList(self, actor: User) -> BoardsListResponse:
+        from datetime import datetime, time, timezone
+
         result = await self.db.execute(
             select(Board).where(Board.is_removed == False)
         )
@@ -45,16 +47,61 @@ class BoardService:
             if str(actor.id) in members or str(actor.id) == str(b.created_by_id):
                 visible_boards.append(b)
 
-        previews = [
-            {
+        # Визначаємо, чи це менеджер (order <= 3) чи звичайний (order >= 4)
+        is_manager = actor.role and actor.role.order <= 3
+
+        now = datetime.utcnow()
+        today_start = datetime.combine(now.date(), time.min)
+        today_end = datetime.combine(now.date(), time.max)
+
+        board_ids = [b.id for b in visible_boards]
+        tasks_result = await self.db.execute(
+            select(Task).where(
+                Task.board_id.in_(board_ids),
+                Task.is_archived == False,
+                Task.is_removed == False,
+            )
+        )
+        all_tasks = tasks_result.scalars().all()
+
+        # Групуємо по дошці
+        tasks_by_board: dict[str, list] = {}
+        for t in all_tasks:
+            bid = str(t.board_id)
+            if bid not in tasks_by_board:
+                tasks_by_board[bid] = []
+            tasks_by_board[bid].append(t)
+
+        previews = []
+        for b in visible_boards:
+            board_tasks = tasks_by_board.get(str(b.id), [])
+
+            # Для звичайних юзерів — тільки задачі де вони призначені
+            if not is_manager:
+                board_tasks = [t for t in board_tasks if t.assignee_ids and actor.id in t.assignee_ids]
+
+            total = len(board_tasks)
+            done = sum(1 for t in board_tasks if t.status == TaskStatus.done)
+            overdue = sum(
+                1 for t in board_tasks
+                if t.status != TaskStatus.done and t.deadline_at and t.deadline_at < now
+            )
+            due_today = sum(
+                1 for t in board_tasks
+                if t.status != TaskStatus.done and t.deadline_at and today_start <= t.deadline_at <= today_end
+            )
+
+            previews.append({
                 "id": b.id,
                 "name": b.name,
                 "description": b.description,
                 "banner_url": b.banner_url,
                 "created_at": b.created_at,
-            }
-            for b in visible_boards
-        ]
+                "total_tasks": total,
+                "done_tasks": done,
+                "overdue_tasks": overdue,
+                "due_today_tasks": due_today,
+            })
 
         return BoardsListResponse(total=len(previews), list=previews)
 
@@ -276,7 +323,8 @@ class BoardService:
             list_id: uuid.UUID,
             name: Optional[str],
             color: Optional[str],
-            actor: User
+            order: Optional[int] = None,
+            actor: User = None,
     ):
         # 1. Перевіряємо дошку
         board = await self.db.get(Board, board_id)
@@ -305,6 +353,10 @@ class BoardService:
             lst.color = color
             if old_color != lst.color:
                 changed_fields.append("color")
+
+        if order is not None:
+            lst.order = order
+            changed_fields.append("order")
 
         # 4. Commit
         await self.db.commit()

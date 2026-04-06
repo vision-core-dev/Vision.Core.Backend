@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
 
 from app.Objects.BadgeModel import UserBadge, Badge, UserBadgeBase
-from app.Objects.UserModel import User, UserRole
+from app.Objects.UserModel import User, UserRole, UserPreview
 from app.Objects.finance.TransactionModel import Transaction
 from app.Objects.tasks.TaskModel import Task, TaskStatus
 from app.Services.Hub.AuthService import AuthService, get_hashed_password
@@ -31,11 +31,35 @@ class UserService:
         return CreateUserResponse(user_id=result.user_id)
 
     async def GetUsersList(self, only_active: bool = False) -> UsersListResponse:
+        from app.Objects.tasks.BoardModel import Board
+
         stmt = await self.db.execute(
             select(User).where(User.is_active == only_active if only_active else True).options(selectinload(User.role))
         )
-        result = stmt.scalars().all()
-        return UsersListResponse(total=len(result), list=result)
+        users = stmt.scalars().all()
+
+        # Load all boards once to map user -> board names
+        boards_result = await self.db.execute(
+            select(Board).where(Board.is_removed == False)
+        )
+        all_boards = boards_result.scalars().all()
+
+        user_boards: dict[str, list[str]] = {}
+        for b in all_boards:
+            members = b.members or {}
+            for uid in list(members.keys()) + ([str(b.created_by_id)] if b.created_by_id else []):
+                if uid not in user_boards:
+                    user_boards[uid] = []
+                if b.name not in user_boards[uid]:
+                    user_boards[uid].append(b.name)
+
+        previews = []
+        for u in users:
+            preview = UserPreview.model_validate(u)
+            preview.board_names = user_boards.get(str(u.id), [])
+            previews.append(preview)
+
+        return UsersListResponse(total=len(previews), list=previews)
 
     async def GetPublicUsersList(self) -> UsersPublicListResponse:
         stmt = await self.db.execute(

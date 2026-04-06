@@ -71,7 +71,7 @@ async def remove_list(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
-    return await BoardService(db).UpdateList(board_id, list_id, data.get("name"), data.get("color"), user)
+    return await BoardService(db).UpdateList(board_id, list_id, data.get("name"), data.get("color"), data.get("order"), user)
 
 @boards_router.post("/{board_id}/Lists/{list_id}/Remove")
 async def remove_list(

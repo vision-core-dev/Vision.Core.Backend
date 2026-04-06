@@ -28,3 +28,6 @@ user_me_router.include_router(my_tasks_router)
 
 from .LinkedAccounts import linked_accounts_router
 user_me_router.include_router(linked_accounts_router)
+
+from .Dashboard import dashboard_router
+user_me_router.include_router(dashboard_router)

@@ -61,3 +61,6 @@ hub_router.include_router(news_router)
 
 from .Drive import drive_router
 hub_router.include_router(drive_router)
+
+from .Badges import badges_router
+hub_router.include_router(badges_router)

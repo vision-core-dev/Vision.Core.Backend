@@ -69,6 +69,9 @@ class User(Base):
     notify_discord = Column(Boolean, nullable=False, server_default=sql.expression.false())
     notify_telegram = Column(Boolean, nullable=False, server_default=sql.expression.false())
 
+    # Active badge emoji (displayed next to name)
+    active_badge_emoji = Column(String(10), nullable=True)
+
     # Session / identity
     temp_token = Column(UUID(as_uuid=True), unique=True, nullable=True)
     last_login = Column(DateTime(timezone=True), nullable=True)
@@ -129,6 +132,7 @@ class UserShort(PydModel):
     first_name: str
     last_name: str | None = None
     avatar_url: str | None = None
+    active_badge_emoji: str | None = None
 
 class UserPreview(PydModel):
     id: uuid.UUID
@@ -141,7 +145,9 @@ class UserPreview(PydModel):
     role_name: str | None = None
     is_active: bool = False
     created_at: datetime | None = None
+    active_badge_emoji: str | None = None
     discord_username: str | None = None
+    telegram_username: str | None = None
     board_names: list[str] = []
 
 class UserBase(PydModel):
@@ -159,6 +165,7 @@ class UserBase(PydModel):
     last_login: datetime | None
     created_at: datetime
     updated_at: datetime | None = None
+    active_badge_emoji: str | None = None
     google_id: Optional[str] = None
     google_email: Optional[str] = None
     discord_id: Optional[str] = None
@@ -183,6 +190,7 @@ class MeUserBase(PydModel):
     is_active: bool
     notify_discord: bool = False
     notify_telegram: bool = False
+    active_badge_emoji: str | None = None
     google_id: Optional[str] = None
     google_email: Optional[str] = None
     discord_id: Optional[str] = None

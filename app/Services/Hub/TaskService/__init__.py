@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.Infrastructure.Storage import _upload_to_bunny
 from app.Objects.LogModel import ActionType
 from app.Objects.tasks.BoardModel import Board
+from app.Objects.tasks.BoardListModel import BoardList
 from app.Objects.tasks.SubtaskModel import Subtask, SubtaskBase, SubtaskStatus
 from app.Objects.tasks.TaskAttachment import TaskAttachment, TaskComment
 from app.Objects.tasks.TaskModel import Task, TaskStatus
@@ -659,8 +660,23 @@ class TaskService:
         if not task:
             raise HTTPException(status_code=404, detail="task_not_found")
 
+        old_list_id = task.list_id
+
         # Оновлюємо список
         task.list_id = list_id
+
+        # Сповіщення якщо список змінився
+        if str(old_list_id) != str(list_id) and task.assignee_ids:
+            new_list = await self.db.get(BoardList, list_id)
+            list_name = new_list.name if new_list else "інший список"
+            for uid in task.assignee_ids:
+                await self._notify.CreateNotification(
+                    user_id=uid,
+                    title="📋 Задачу переміщено",
+                    message=f"Задачу <b>{task.name}</b> переміщено в <b>{list_name}</b>",
+                    link=f"/boards/b/{task.board_id}/t/{task_id}",
+                )
+
         await self.db.commit()
 
         return {
@@ -843,6 +859,8 @@ class TaskService:
         if not task:
             raise HTTPException(status_code=404, detail="task_not_found")
 
+        was_done = task.status == TaskStatus.done
+
         # 🎯 Оновлюємо статус задачі залежно від підзадач
         if all_done:
             task.status = TaskStatus.done
@@ -858,9 +876,18 @@ class TaskService:
                         link=f"/boards/b/{task.board_id}/t/{task.id}",
                     )
         else:
-            # Якщо хоча б одна не виконана, повертаємо в in_progress
             task.status = TaskStatus.in_progress
             task.completed_at = None
+
+            # Сповіщення якщо задачу повернули з done
+            if was_done and task.assignee_ids:
+                for uid in task.assignee_ids:
+                    await self._notify.CreateNotification(
+                        user_id=uid,
+                        title="🔄 Задачу відновлено",
+                        message=f"Задачу <b>{task.name}</b> повернуто в роботу",
+                        link=f"/boards/b/{task.board_id}/t/{task.id}",
+                    )
 
         await self.db.commit()
 

@@ -84,7 +84,7 @@ class UserService:
                 actions.append("deactivate_user")
             else:
                 actions.append("activate_user")
-        if actor_role.order <= 1:
+        if actor_role.order <= 2:
             actions.append("give_badge")
             actions.append("remove_badge")
 

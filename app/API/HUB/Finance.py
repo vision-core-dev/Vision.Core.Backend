@@ -263,6 +263,7 @@ async def get_transactions_list(
             "avatar_url": u.avatar_url,
             "first_name": u.first_name,
             "last_name": u.last_name,
+            "active_badge_emoji": u.active_badge_emoji,
         }
         for u in users_result.scalars().all()
     ]
@@ -555,6 +556,7 @@ async def get_unwithdrawn_list(
                 "first_name": u.first_name,
                 "last_name": u.last_name,
                 "avatar_url": u.avatar_url,
+                "active_badge_emoji": u.active_badge_emoji,
             },
             "amount": real_balance,
             "last_withdraw_amount": float(last_tx.amount) if last_tx else 0.0,
@@ -591,6 +593,7 @@ async def get_leaderboard(user: User = Depends(getuser), db: AsyncSession = Depe
             User.first_name,
             User.last_name,
             User.avatar_url,
+            User.active_badge_emoji,
             total_earnings_expr.label("total_earnings")
         )
         .outerjoin(Transaction, Transaction.user_id == User.id)
@@ -607,6 +610,7 @@ async def get_leaderboard(user: User = Depends(getuser), db: AsyncSession = Depe
             "first_name": row.first_name,
             "last_name": row.last_name,
             "avatar_url": row.avatar_url,
+            "active_badge_emoji": row.active_badge_emoji,
             "total_earnings": float(row.total_earnings)
         })
 

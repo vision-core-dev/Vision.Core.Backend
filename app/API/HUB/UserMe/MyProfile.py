@@ -91,6 +91,32 @@ async def upload_avatar(
     }
 
 
+class ChangeMyPasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@my_profile_router.post("/ChangePassword", status_code=200)
+async def change_my_password(
+    data: ChangeMyPasswordRequest,
+    user: User = Depends(getuser),
+    db: AsyncSession = Depends(getdb),
+):
+    from app.Services.Hub.AuthService.utils import check_password, get_hashed_password
+
+    if not user.hashed_password or not check_password(data.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="invalid_current_password")
+
+    if len(data.new_password) < 8:
+        raise HTTPException(status_code=400, detail="password_too_short")
+
+    user.hashed_password = get_hashed_password(data.new_password)
+    db.add(user)
+    await db.commit()
+
+    return {"status": "ok"}
+
+
 class UpdateNotifySettingsRequest(BaseModel):
     notify_discord: bool | None = None
     notify_telegram: bool | None = None

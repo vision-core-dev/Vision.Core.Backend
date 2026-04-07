@@ -64,3 +64,6 @@ hub_router.include_router(drive_router)
 
 from .Badges import badges_router
 hub_router.include_router(badges_router)
+
+from .Kolektoral import kolektoral_router
+hub_router.include_router(kolektoral_router)

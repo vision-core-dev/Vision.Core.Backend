@@ -17,6 +17,36 @@ from app.Services.Hub.AuthService.depends import getuser
 forms_router = APIRouter(prefix="/Forms", tags=["Forms"])
 
 
+@forms_router.get("/List")
+async def list_forms(
+    db: AsyncSession = Depends(getdb),
+    user: User = Depends(getuser),
+):
+    if not user.role or user.role.order > 3:
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    from sqlalchemy import func as sqlfunc
+    result = await db.execute(
+        select(Form).order_by(Form.created_at.desc())
+    )
+    forms = result.scalars().all()
+
+    out = []
+    for f in forms:
+        count_res = await db.execute(
+            select(sqlfunc.count()).select_from(FormResult).where(FormResult.form_id == f.id)
+        )
+        out.append({
+            "id": str(f.id),
+            "title": f.title,
+            "slug": f.slug,
+            "is_anonymous": f.is_anonymous,
+            "results_count": count_res.scalar() or 0,
+            "created_at": f.created_at.isoformat() if f.created_at else None,
+        })
+    return out
+
+
 class GetFormRequest(BaseModel):
     slug: str
 

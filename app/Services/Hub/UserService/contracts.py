@@ -45,6 +45,13 @@ class UserTaskPreview(BaseModel):
     list_name: Optional[str] = None
 
 
+class UserPositionPreview(BaseModel):
+    position: str = ""
+    project: Optional[str] = None
+    project_type: Optional[str] = None
+    is_head: bool = False
+
+
 class UserDetailsResponse(BaseModel):
     user: UserBase
     actions: list[str] = []
@@ -53,6 +60,7 @@ class UserDetailsResponse(BaseModel):
     badges: list[UserBadgeBase] = []
     transactions: list[TransactionBase] = []
     tasks: list[UserTaskPreview] = []
+    positions: list[UserPositionPreview] = []
     tasks_total_completed: int = 0
     tasks_total_active: int = 0
 

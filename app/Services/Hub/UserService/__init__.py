@@ -173,6 +173,28 @@ class UserService:
         # Тому просто рахуємо скільки з них не done
         active_count = sum(1 for t in user_tasks if t.status != TaskStatus.done)
 
+        # 📍 Позиції в оргструктурі
+        from app.Objects.OrgStructureModel import OrgStructureNode
+        from app.Services.Hub.UserService.contracts import UserPositionPreview
+
+        org_result = await self.db.execute(
+            select(OrgStructureNode)
+            .where(OrgStructureNode.user_id == user_id, OrgStructureNode.is_active == True)
+            .options(selectinload(OrgStructureNode.parent))
+        )
+        positions = []
+        for node in org_result.scalars().all():
+            parent = node.parent
+            is_head = False
+            if parent and parent.meta_data and parent.meta_data.get("head_user_id"):
+                is_head = str(parent.meta_data["head_user_id"]) == str(user_id)
+            positions.append(UserPositionPreview(
+                position=node.name or "",
+                project=parent.name if parent else None,
+                project_type=parent.node_type.value if parent else None,
+                is_head=is_head,
+            ))
+
         return UserDetailsResponse(
             user=user,
             actions=actions,
@@ -181,6 +203,7 @@ class UserService:
             badges=badges,
             transactions=transactions,
             tasks=tasks_list,
+            positions=positions,
             tasks_total_completed=completed_count,
             tasks_total_active=active_count
         )

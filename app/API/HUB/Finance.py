@@ -615,3 +615,79 @@ async def get_leaderboard(user: User = Depends(getuser), db: AsyncSession = Depe
         })
 
     return {"items": items}
+
+
+@finance_router.get("/GetStats")
+async def get_finance_stats(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    """
+    Фінансова статистика:
+    - Дохід робітників = income - deduction
+    - Виплачено = withdrawal (факт. виплати)
+    - До виплати = дохід - (deduction + |withdrawal + expense|)
+    """
+    from datetime import timedelta
+
+    async def _sum(type_filter, date_from=None, date_to=None):
+        q = select(func.coalesce(func.sum(func.abs(Transaction.amount)), 0.0)).where(
+            Transaction.is_removed == False,
+            Transaction.type.in_(type_filter) if isinstance(type_filter, list) else Transaction.type == type_filter,
+        )
+        if date_from:
+            q = q.where(Transaction.transaction_at >= date_from)
+        if date_to:
+            q = q.where(Transaction.transaction_at < date_to)
+        return float((await db.execute(q)).scalar())
+
+    now = datetime.utcnow()
+    months = []
+    for i in range(5, -1, -1):
+        d = now.replace(day=1) - timedelta(days=i * 30)
+        ms = d.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        me = ms.replace(year=ms.year + 1, month=1) if ms.month == 12 else ms.replace(month=ms.month + 1)
+
+        income = await _sum(TransactionType.INCOME, ms, me)
+        withdrawn = await _sum(TransactionType.WITHDRAWAL, ms, me)
+
+        months.append({
+            "month": ms.strftime("%Y-%m"),
+            "label": ms.strftime("%b"),
+            "income": income,
+            "withdrawn": withdrawn,
+        })
+
+    # Totals
+    total_income = await _sum(TransactionType.INCOME)
+    total_deduction = await _sum(TransactionType.DEDUCTION)
+    total_withdrawn = await _sum(TransactionType.WITHDRAWAL)
+
+    workers_income = total_income + total_deduction
+    paid_out = total_withdrawn
+
+    # До виплати = сума реальних балансів (з транзакцій) активних юзерів з позитивним балансом
+    to_pay_subq = (
+        select(
+            Transaction.user_id,
+            func.sum(Transaction.amount).label("balance")
+        )
+        .where(Transaction.is_removed == False)
+        .group_by(Transaction.user_id)
+        .subquery()
+    )
+    to_pay_res = await db.execute(
+        select(func.coalesce(func.sum(to_pay_subq.c.balance), 0.0))
+        .join(User, User.id == to_pay_subq.c.user_id)
+        .where(User.is_active == True, to_pay_subq.c.balance > 0)
+    )
+    to_pay = float(to_pay_res.scalar())
+
+    active_users_res = await db.execute(
+        select(func.count()).select_from(User).where(User.is_active == True)
+    )
+
+    return {
+        "months": months,
+        "workers_income": workers_income,
+        "paid_out": paid_out,
+        "to_pay": max(to_pay, 0),
+        "total_users": active_users_res.scalar() or 0,
+    }

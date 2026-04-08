@@ -13,6 +13,7 @@ from app.Objects.finance.TransactionModel import Transaction, TransactionType
 from app.Objects.tasks.TaskModel import Task, TaskStatus
 from app.Objects.tasks.SubtaskModel import SubtaskStatus
 from app.Objects.tasks.TaskTags import TaskTag
+from app.Objects.OrgStructureModel import OrgStructureNode, NodeType
 from app.Services.Hub.AuthService.depends import getuser
 
 dashboard_router = APIRouter(prefix="/Dashboard", tags=["Hub > UserMe > Dashboard"])
@@ -140,9 +141,51 @@ async def get_dashboard(
             } if author else None,
         })
 
+    # 5. User positions in org structure
+    org_nodes_result = await db.execute(
+        select(OrgStructureNode)
+        .where(OrgStructureNode.user_id == user.id, OrgStructureNode.is_active == True)
+        .options(selectinload(OrgStructureNode.parent))
+    )
+    positions = []
+    for node in org_nodes_result.scalars().all():
+        parent = node.parent
+        is_head = False
+        if parent and parent.meta_data and parent.meta_data.get("head_user_id"):
+            is_head = str(parent.meta_data["head_user_id"]) == str(user.id)
+        positions.append({
+            "position": node.name or "",
+            "project": parent.name if parent else None,
+            "project_type": parent.node_type.value if parent else None,
+            "is_head": is_head,
+        })
+
+    # 6. Supervisors & subordinates
+    supervisors_list = []
+    subordinates_list = []
+    if user.supervisor_ids:
+        sup_result = await db.execute(select(User).where(User.id.in_(user.supervisor_ids)))
+        for s in sup_result.scalars().all():
+            supervisors_list.append({
+                "id": str(s.id), "first_name": s.first_name, "last_name": s.last_name,
+                "avatar_url": s.avatar_url, "active_badge_emoji": s.active_badge_emoji,
+                "role_name": s.role.name if s.role else None,
+            })
+
+    sub_result = await db.execute(select(User).where(User.supervisor_ids.any(user.id)))
+    for s in sub_result.scalars().all():
+        subordinates_list.append({
+            "id": str(s.id), "first_name": s.first_name, "last_name": s.last_name,
+            "avatar_url": s.avatar_url, "active_badge_emoji": s.active_badge_emoji,
+            "role_name": s.role.name if s.role else None,
+        })
+
     return {
         "tasks": tasks,
         "leaderboard": leaderboard,
         "badge_awards": badge_awards,
         "news": news_items,
+        "positions": positions,
+        "supervisors": supervisors_list,
+        "subordinates": subordinates_list,
     }

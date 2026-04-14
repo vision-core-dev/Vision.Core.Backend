@@ -13,6 +13,7 @@ from app.Objects.BlogPostSchemas import (
     ListBlogPostsResponse,
 )
 from app.Services.Hub.AuthService.depends import getuser
+from app.Services.RoVision.content import sanitize_html, estimate_reading_time
 
 blog_router = APIRouter(prefix="/Blog", tags=["RoVision > Blog"])
 
@@ -72,10 +73,12 @@ async def create_post(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Slug вже існує")
 
-    post = BlogPost(
-        author_id=user.id,
-        **data.model_dump(),
-    )
+    payload = data.model_dump()
+    payload["content"] = sanitize_html(payload.get("content"))
+    if not payload.get("reading_time"):
+        payload["reading_time"] = estimate_reading_time(payload["content"])
+
+    post = BlogPost(author_id=user.id, **payload)
     db.add(post)
     await db.commit()
     await db.refresh(post)
@@ -95,7 +98,12 @@ async def update_post(
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    for key, value in data.model_dump(exclude_unset=True).items():
+    updates = data.model_dump(exclude_unset=True)
+    if "content" in updates:
+        updates["content"] = sanitize_html(updates["content"])
+        if not updates.get("reading_time"):
+            updates["reading_time"] = estimate_reading_time(updates["content"])
+    for key, value in updates.items():
         setattr(post, key, value)
 
     await db.commit()

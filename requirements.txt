@@ -31,3 +31,4 @@ psycopg2-binary
 bunnycdnpython
 python-multipart
 pytz
+bleach

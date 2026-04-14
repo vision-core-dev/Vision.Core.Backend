@@ -13,6 +13,7 @@ from app.Objects.JobSchemas import (
     ListJobsResponse,
 )
 from app.Services.Hub.AuthService.depends import getuser
+from app.Services.RoVision.content import sanitize_html
 
 jobs_router = APIRouter(prefix="/Jobs", tags=["RoVision > Jobs"])
 
@@ -72,7 +73,10 @@ async def create_job(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Slug вже існує")
 
-    job = Job(**data.model_dump())
+    payload = data.model_dump()
+    payload["description"] = sanitize_html(payload.get("description"))
+
+    job = Job(**payload)
     db.add(job)
     await db.commit()
     await db.refresh(job)
@@ -92,7 +96,10 @@ async def update_job(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    for key, value in data.model_dump(exclude_unset=True).items():
+    updates = data.model_dump(exclude_unset=True)
+    if "description" in updates:
+        updates["description"] = sanitize_html(updates["description"])
+    for key, value in updates.items():
         setattr(job, key, value)
 
     await db.commit()

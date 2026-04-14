@@ -10,3 +10,6 @@ rovision_router.include_router(blog_router)
 
 from .Jobs import jobs_router
 rovision_router.include_router(jobs_router)
+
+from .Contact import contact_router
+rovision_router.include_router(contact_router)

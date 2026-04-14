@@ -22,6 +22,27 @@ contact_router = APIRouter(prefix="/Contact", tags=["RoVision > Contact"])
 CONTACT_WEBHOOK_URL = os.getenv("CONTACT_WEBHOOK_URL")
 CONTACT_WEBHOOK_TOKEN = os.getenv("CONTACT_WEBHOOK_TOKEN")
 
+TURNSTILE_SECRET_KEY = os.getenv("TURNSTILE_SECRET_KEY")
+TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+
+
+async def _verify_turnstile(token: str | None, remote_ip: str | None) -> bool:
+    if not TURNSTILE_SECRET_KEY:
+        return True  # turnstile not configured — skip
+    if not token:
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            data = {"secret": TURNSTILE_SECRET_KEY, "response": token}
+            if remote_ip:
+                data["remoteip"] = remote_ip
+            r = await client.post(TURNSTILE_VERIFY_URL, data=data)
+            result = r.json()
+            return bool(result.get("success"))
+    except Exception as e:
+        print(f"[Turnstile] verify failed: {e}")
+        return False
+
 
 async def _send_webhook(payload: dict) -> None:
     if not CONTACT_WEBHOOK_URL:
@@ -57,6 +78,11 @@ async def create_request(
     request: Request,
     db: AsyncSession = Depends(getdb),
 ):
+    client_ip = _client_ip(request)
+
+    if not await _verify_turnstile(data.turnstile_token, client_ip):
+        raise HTTPException(status_code=403, detail="Не вдалося пройти перевірку Cloudflare. Оновіть сторінку та спробуйте ще раз.")
+
     telegram = data.telegram
     if telegram:
         telegram = telegram.strip().lstrip("@")
@@ -69,7 +95,7 @@ async def create_request(
         phone=data.phone.strip() if data.phone else None,
         telegram=telegram,
         message=data.message.strip(),
-        ip_address=_client_ip(request),
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
     )
     db.add(entry)

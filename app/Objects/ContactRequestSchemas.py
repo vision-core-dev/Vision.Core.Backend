@@ -12,6 +12,14 @@ class CreateContactRequest(BaseModel):
     phone: str | None = Field(default=None, max_length=50)
     telegram: str | None = Field(default=None, max_length=100)
     message: str = Field(min_length=10, max_length=10000)
+    consent: bool = False
+    turnstile_token: str | None = None
+
+    @model_validator(mode="after")
+    def require_consent(self):
+        if not self.consent:
+            raise ValueError("Потрібна згода з політикою конфіденційності")
+        return self
 
     @model_validator(mode="after")
     def at_least_one_contact(self):
@@ -30,6 +38,8 @@ class ContactRequestResponse(PydModel):
     message: str
     is_handled: bool
     created_at: datetime
+    ip_address: str | None = None
+    user_agent: str | None = None
 
 
 class ListContactRequestsResponse(BaseModel):

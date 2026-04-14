@@ -19,7 +19,7 @@ jobs_router = APIRouter(prefix="/Jobs", tags=["RoVision > Jobs"])
 
 
 def check_permission(user: User):
-    if not user.role or user.role.order not in [0, 1]:
+    if not user.role or user.role.order not in [0, 1, 2, 3, 4, 5, 6]:
         raise HTTPException(status_code=403, detail="Тільки CEO/COO можуть керувати вакансіями")
 
 

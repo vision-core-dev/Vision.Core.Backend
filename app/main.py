@@ -56,7 +56,7 @@ security_scheme = HTTPBearer()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://hub.vcore.dev",
+        "https://hub.visioncore.dev",
         "https://hub.visioncore.dev",
         "http://localhost:5173",
     ],

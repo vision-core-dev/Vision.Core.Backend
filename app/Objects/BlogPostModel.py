@@ -25,6 +25,7 @@ class BlogPost(Base):
 
     is_anonymous = Column(Boolean, nullable=False, default=False)
     is_published = Column(Boolean, nullable=False, default=True)
+    published_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -44,6 +45,7 @@ class BlogPostBase(PydModel):
     reading_time: str | None = None
     is_anonymous: bool = False
     is_published: bool = True
+    published_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

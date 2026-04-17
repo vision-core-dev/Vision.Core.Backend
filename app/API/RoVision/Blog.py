@@ -33,6 +33,7 @@ async def list_posts(db: AsyncSession = Depends(getdb), include_unpublished: boo
     stmt = select(BlogPost).order_by(desc(BlogPost.created_at))
     if not include_unpublished:
         stmt = stmt.where(BlogPost.is_published.is_(True))
+        stmt = stmt.where((BlogPost.published_at.is_(None)) | (BlogPost.published_at <= func.now()))
     result = await db.execute(stmt)
     return {"items": result.scalars().all()}
 
@@ -41,8 +42,16 @@ async def list_posts(db: AsyncSession = Depends(getdb), include_unpublished: boo
 async def get_post_by_slug(slug: str, db: AsyncSession = Depends(getdb)):
     result = await db.execute(select(BlogPost).where(BlogPost.slug == slug))
     post = result.scalar_one_or_none()
+    
+    # We shouldn't need to block accessing by slug if it's not published in the future, 
+    # but strictly speaking public users shouldn't see it.
     if not post or not post.is_published:
         raise HTTPException(status_code=404, detail="Post not found")
+        
+    import datetime
+    if post.published_at and post.published_at.replace(tzinfo=datetime.timezone.utc) > datetime.datetime.now(datetime.timezone.utc):
+        raise HTTPException(status_code=404, detail="Post not found")
+        
     return post
 
 

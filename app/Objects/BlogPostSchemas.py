@@ -16,6 +16,7 @@ class BlogPostBaseSchema(PydModel):
     reading_time: str | None = None
     is_anonymous: bool = False
     is_published: bool = True
+    published_at: datetime | None = None
 
 
 class CreateBlogPostRequest(BlogPostBaseSchema):
@@ -33,6 +34,7 @@ class UpdateBlogPostRequest(PydModel):
     reading_time: str | None = None
     is_anonymous: bool | None = None
     is_published: bool | None = None
+    published_at: datetime | None = None
 
 
 class BlogPostResponse(BlogPostBaseSchema):

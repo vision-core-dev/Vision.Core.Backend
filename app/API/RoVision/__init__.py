@@ -13,3 +13,6 @@ rovision_router.include_router(jobs_router)
 
 from .Contact import contact_router
 rovision_router.include_router(contact_router)
+
+from .Games import games_router
+rovision_router.include_router(games_router)

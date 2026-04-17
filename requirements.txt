@@ -19,6 +19,7 @@ starlette
 pytz
 apscheduler
 cryptography
+openai
 
 redis
 httpx

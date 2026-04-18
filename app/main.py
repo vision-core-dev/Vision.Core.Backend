@@ -19,7 +19,7 @@ scheduler = AsyncIOScheduler()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("🚀 Starting application...")
+    print("Starting application...")
     try:
         app.state.redis = await connect_redis()
 
@@ -34,12 +34,12 @@ async def lifespan(app: FastAPI):
 
         yield
     except Exception as e:
-        print(f"❌ Failed to start application: {e}")
+        print(f"Failed to start application: {e}")
         raise
     finally:
         scheduler.shutdown(wait=False)
         await disconnect_redis(app.state.redis)
-        print("👋 Application stopped")
+        print("Application stopped")
 
 app = FastAPI(
     title="Vision Core Dev API",

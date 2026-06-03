@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from app.Infrastructure.Database import PydModel
-from app.Objects.GameModel import GameBase
+from app.Objects.GameModel import GameBase, GameStatus
 
 class GameBaseSchema(PydModel):
     slug: str
@@ -9,6 +9,7 @@ class GameBaseSchema(PydModel):
     content: str
     thumbnail_url: str | None = None
     play_url: str | None = None
+    status: str = GameStatus.IN_DEVELOPMENT.value
     is_published: bool = True
 
 class CreateGameRequest(GameBaseSchema):
@@ -21,6 +22,7 @@ class UpdateGameRequest(PydModel):
     content: str | None = None
     thumbnail_url: str | None = None
     play_url: str | None = None
+    status: str | None = None
     is_published: bool | None = None
 
 class GameResponse(GameBase):

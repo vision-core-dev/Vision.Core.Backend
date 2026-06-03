@@ -55,6 +55,7 @@ async def create_game(
         content=content_html,
         thumbnail_url=data.thumbnail_url,
         play_url=data.play_url,
+        status=data.status,
         is_published=data.is_published,
     )
     

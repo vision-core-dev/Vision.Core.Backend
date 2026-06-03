@@ -26,11 +26,8 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-        # Deadline reminders — every 30 min
         scheduler.add_job(check_deadline_reminders, "interval", minutes=30)
         scheduler.start()
-
-        # await CurrencyService().RefreshExchangeRate(redis=app.state.redis, currency_code="UAH")
 
         yield
     except Exception as e:

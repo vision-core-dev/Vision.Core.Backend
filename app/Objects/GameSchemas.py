@@ -11,6 +11,7 @@ class GameBaseSchema(PydModel):
     play_url: str | None = None
     status: str = GameStatus.IN_DEVELOPMENT.value
     is_published: bool = True
+    developer_slug: str | None = None
 
 class CreateGameRequest(GameBaseSchema):
     pass
@@ -24,6 +25,7 @@ class UpdateGameRequest(PydModel):
     play_url: str | None = None
     status: str | None = None
     is_published: bool | None = None
+    developer_slug: str | None = None
 
 class GameResponse(GameBase):
     pass

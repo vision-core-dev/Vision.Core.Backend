@@ -30,6 +30,11 @@ class Game(Base):
     status = Column(String(50), nullable=False, server_default=GameStatus.IN_DEVELOPMENT.value)
     is_published = Column(Boolean, nullable=False, default=True)
 
+    # Slug of the developer (studio or person) on the public site. Resolved on the
+    # frontend against src/lib/developers.ts — no DB-level FK because the developer
+    # list lives in the frontend, not in this DB.
+    developer_slug = Column(String(100), nullable=True, index=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -43,5 +48,6 @@ class GameBase(PydModel):
     play_url: str | None = None
     status: str = GameStatus.IN_DEVELOPMENT.value
     is_published: bool = True
+    developer_slug: str | None = None
     created_at: datetime
     updated_at: datetime

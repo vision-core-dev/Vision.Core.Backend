@@ -16,3 +16,6 @@ rovision_router.include_router(contact_router)
 
 from .Games import games_router
 rovision_router.include_router(games_router)
+
+from .Developers import developers_router
+rovision_router.include_router(developers_router)

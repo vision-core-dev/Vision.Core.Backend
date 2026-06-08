@@ -1,0 +1,761 @@
+// Vision.Core.Backend — database schema for https://dbdiagram.io
+// Generated from app/Objects/*.py (SQLAlchemy, PostgreSQL)
+// PK type: id = uuid (gen_random_uuid), unless noted (VisionBot* / VisionSupportUsers use bigint).
+// Soft refs: a few columns are plain uuid in the models with no DB-level FK
+// (UserBadges.user_id, EventInvites.event_id/user_id, KnowledgeDocuments.current_version_id,
+//  VisionSupportAnswers.operator_id) — noted on the column, not drawn as relationships.
+
+//////////////////////////////////////
+// Enums (PostgreSQL ENUM types)
+//////////////////////////////////////
+
+Enum Currency {
+  UAH
+  USD
+  EUR
+}
+
+Enum transactiontype {
+  income
+  expense
+  transfer
+  withdrawal
+  deduction
+}
+
+Enum withdrawalrequeststatus {
+  pending
+  approved
+  rejected
+  paid
+}
+
+Enum driveaccesstype {
+  private
+  role
+  public
+}
+
+Enum taskstatus {
+  backlog
+  in_progress
+  review
+  done
+}
+
+Enum taskpriority {
+  low
+  medium
+  high
+}
+
+Enum attachmenttype {
+  file
+  link
+}
+
+Enum nodetype {
+  department
+  project
+  user
+}
+
+Enum chattype {
+  direct
+  group
+}
+
+Enum chatmemberrole {
+  admin
+  member
+}
+
+Enum knowledgeaccesslevel {
+  read
+  write
+}
+
+Enum actiontype {
+  create
+  update
+  delete
+  restore
+  view
+  download
+  upload
+  grant_access
+  revoke_access
+  change_role
+  status_change
+  archive
+  unarchive
+  assign
+  unassign
+  move
+  complete
+  reopen
+  login
+  logout
+  export
+  import
+}
+
+//////////////////////////////////////
+// Identity & access
+//////////////////////////////////////
+
+Table Users {
+  id uuid [pk]
+  email varchar(100) [unique, null]
+  hashed_password varchar(255) [null]
+  balance float [not null, default: 0]
+  withdrawn_amount float [not null, default: 0]
+  currency Currency [not null, default: 'UAH']
+  is_active boolean [not null, default: true]
+  is_balance_visible boolean [not null, default: false]
+  is_need_accept_terms boolean [not null, default: true]
+  is_terms_accepted boolean [not null, default: false]
+  terms_accepted_at timestamptz [null]
+  role_id uuid [null, ref: > UserRoles.id]
+  supervisor_ids "uuid[]" [null]
+  first_name varchar(100) [not null]
+  last_name varchar(100) [null]
+  avatar_url varchar(255) [null]
+  birthday timestamptz [null]
+  google_id varchar(100) [unique, null]
+  google_email varchar(255) [null]
+  discord_id varchar(100) [unique, null]
+  discord_username varchar(255) [null]
+  telegram_id varchar(100) [unique, null]
+  telegram_username varchar(255) [null]
+  roblox_id varchar(100) [unique, null]
+  roblox_username varchar(255) [null]
+  notify_discord boolean [not null, default: false]
+  notify_telegram boolean [not null, default: false]
+  active_badge_emoji varchar(10) [null]
+  temp_token uuid [unique, null]
+  last_login timestamptz [null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table UserRoles {
+  id uuid [pk]
+  key varchar(50) [unique, not null]
+  name varchar(50) [unique, not null]
+  menu "text[]" [not null]
+  order integer [not null, default: 0]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [null]
+}
+
+//////////////////////////////////////
+// Badges
+//////////////////////////////////////
+
+Table Badges {
+  id uuid [pk]
+  name varchar(100) [not null]
+  description text [null]
+  icon_url varchar(255) [null]
+  emoji varchar(10) [null]
+  created_at timestamptz [default: `now()`]
+}
+
+Table UserBadges {
+  id uuid [pk]
+  user_id uuid [not null, note: 'soft ref -> Users.id (no DB FK)']
+  badge_id uuid [not null, ref: > Badges.id]
+  awarded_at timestamptz [default: `now()`]
+}
+
+//////////////////////////////////////
+// Org structure (adjacency-list tree)
+//////////////////////////////////////
+
+Table OrgStructureNodes {
+  id uuid [pk]
+  node_type nodetype [not null]
+  name varchar(200) [null]
+  description text [null]
+  user_id uuid [null, ref: > Users.id]
+  parent_id uuid [null, ref: > OrgStructureNodes.id]
+  order integer [not null, default: 0]
+  meta_data jsonb [null]
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+//////////////////////////////////////
+// Events
+//////////////////////////////////////
+
+Table Events {
+  id uuid [pk]
+  name varchar(100) [not null]
+  description text [null]
+  date timestamp [not null]
+  time_from time [not null]
+  time_to time [not null]
+  location varchar(255) [null]
+  location_url text [null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table EventInvites {
+  id uuid [pk]
+  event_id uuid [not null, note: 'soft ref -> Events.id (no DB FK)']
+  user_id uuid [not null, note: 'soft ref -> Users.id (no DB FK)']
+  status varchar(50) [not null, default: 'pending', note: 'pending | accepted | declined | no_show | attended']
+  reason text [null]
+  responded_at timestamptz [null]
+  attended_at timestamptz [null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+//////////////////////////////////////
+// Drive (files & folders)
+//////////////////////////////////////
+
+Table DriveFolders {
+  id uuid [pk]
+  name varchar(255) [not null]
+  parent_id uuid [null, ref: > DriveFolders.id]
+  owner_id uuid [not null, ref: > Users.id]
+  access_type driveaccesstype [not null, default: 'public']
+  allowed_role_ids "uuid[]" [null]
+  is_task_disk boolean [not null, default: false]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table DriveFiles {
+  id uuid [pk]
+  folder_id uuid [null, ref: > DriveFolders.id]
+  owner_id uuid [not null, ref: > Users.id]
+  name varchar(512) [not null]
+  url text [not null]
+  size bigint [not null, default: 0]
+  mime_type varchar(255) [null]
+  access_type driveaccesstype [not null, default: 'public']
+  allowed_role_ids "uuid[]" [null]
+  task_attachment_id uuid [null, ref: > TaskAttachments.id]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+//////////////////////////////////////
+// Notifications
+//////////////////////////////////////
+
+Table UserNotifs {
+  id uuid [pk]
+  user_id uuid [not null, ref: > Users.id]
+  title varchar(100) [not null]
+  message varchar(255) [not null]
+  link text [null]
+  is_read boolean [not null, default: false]
+  created_at timestamptz [default: `now()`]
+}
+
+//////////////////////////////////////
+// Activity log
+//////////////////////////////////////
+
+Table Logs {
+  id uuid [pk]
+  actor_id uuid [null, ref: > Users.id]
+  entity_type varchar(100) [not null]
+  entity_id uuid [not null]
+  entity_name varchar(500) [null]
+  action actiontype [not null]
+  old_values jsonb [null]
+  new_values jsonb [null]
+  changed_fields jsonb [null]
+  details text [null]
+  extra_data jsonb [null]
+  ip_address varchar(45) [null]
+  user_agent text [null]
+  request_id varchar(100) [null]
+  created_at timestamptz [default: `now()`]
+
+  indexes {
+    (entity_type, entity_id) [name: 'idx_logs_entity']
+    (actor_id, action) [name: 'idx_logs_actor_action']
+    created_at [name: 'idx_logs_created_at_desc']
+  }
+}
+
+//////////////////////////////////////
+// Knowledge base
+//////////////////////////////////////
+
+Table KnowledgeFolders {
+  id uuid [pk]
+  name varchar(200) [not null]
+  parent_id uuid [null, ref: > KnowledgeFolders.id]
+  created_at timestamptz [default: `now()`]
+}
+
+Table KnowledgeDocuments {
+  id uuid [pk]
+  title varchar(200) [not null]
+  folder_id uuid [null, ref: > KnowledgeFolders.id]
+  author_id uuid [not null, ref: > Users.id]
+  current_version_id uuid [null, note: 'soft ref -> KnowledgeVersions.id (viewonly, no DB FK)']
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table KnowledgeVersions {
+  id uuid [pk]
+  document_id uuid [ref: > KnowledgeDocuments.id]
+  content text [not null]
+  author_id uuid [not null, ref: > Users.id]
+  created_at timestamptz [default: `now()`]
+}
+
+Table KnowledgeAccess {
+  id uuid [pk]
+  role_id uuid [not null, ref: > UserRoles.id]
+  folder_id uuid [null, ref: > KnowledgeFolders.id]
+  document_id uuid [null, ref: > KnowledgeDocuments.id]
+  access_level knowledgeaccesslevel [not null, default: 'read']
+  created_at timestamptz [default: `now()`]
+}
+
+//////////////////////////////////////
+// Boards / tasks (kanban)
+//////////////////////////////////////
+
+Table Boards {
+  id uuid [pk]
+  name varchar(255) [not null]
+  description text [null]
+  banner_url text [null]
+  members json [not null, default: '{}', note: 'membership map { user_id: role }']
+  created_by_id uuid [null, ref: > Users.id]
+  is_removed boolean [default: false]
+  is_public boolean [default: false]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table BoardLists {
+  id uuid [pk]
+  board_id uuid [null, ref: > Boards.id]
+  name varchar(100) [not null]
+  order integer [default: 0]
+  color varchar(20) [null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table Tasks {
+  id uuid [pk]
+  board_id uuid [null, ref: > Boards.id]
+  list_id uuid [null, ref: > BoardLists.id]
+  order "numeric(10,2)" [null]
+  is_archived boolean [default: false]
+  is_removed boolean [default: false]
+  name varchar(255) [not null]
+  description text [null]
+  banner_url text [null]
+  tags "uuid[]" [null, note: 'soft refs -> TaskTags.id']
+  assignee_ids "uuid[]" [null, note: 'soft refs -> Users.id']
+  created_by_id uuid [null, ref: > Users.id]
+  value_uah "numeric(10,2)" [default: 0]
+  penalty_uah "numeric(10,2)" [default: 0]
+  is_accrued boolean [default: false]
+  started_at timestamp [null]
+  deadline_at timestamp [null]
+  completed_at timestamp [null]
+  status taskstatus [default: 'backlog']
+  priority taskpriority [default: 'low']
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table Subtasks {
+  id uuid [pk]
+  task_id uuid [null, ref: > Tasks.id]
+  assignee_id uuid [null, ref: > Users.id]
+  name varchar(255) [not null]
+  status varchar(50) [not null, default: 'no_status', note: 'no_status | in_progress | completed']
+  deadline_at timestamptz [null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table TaskAttachments {
+  id uuid [pk]
+  task_id uuid [null, ref: > Tasks.id]
+  type attachmenttype [not null]
+  url text [not null]
+  name varchar(255) [null]
+  created_at timestamptz [default: `now()`]
+}
+
+Table TaskComments {
+  id uuid [pk]
+  task_id uuid [null, ref: > Tasks.id]
+  user_id uuid [null, ref: > Users.id]
+  content text [not null]
+  created_at timestamptz [default: `now()`]
+}
+
+Table TaskTags {
+  id uuid [pk]
+  name varchar(100) [not null]
+  color varchar(7) [not null, note: 'hex color, e.g. #FF5733']
+  board_id uuid [not null, ref: > Boards.id]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+//////////////////////////////////////
+// Finance
+//////////////////////////////////////
+
+Table Transactions {
+  id uuid [pk]
+  name text [null]
+  type transactiontype [not null]
+  amount float [not null]
+  user_id uuid [null, ref: > Users.id]
+  created_by_id uuid [null, ref: > Users.id]
+  task_id uuid [null, ref: > Tasks.id]
+  is_future boolean [default: false]
+  is_removed boolean [default: false]
+  transaction_at timestamptz [default: `now()`]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table TaskAccruals {
+  id uuid [pk]
+  task_id uuid [not null, ref: > Tasks.id]
+  user_id uuid [not null, ref: > Users.id]
+  created_by_id uuid [null, ref: > Users.id]
+  name varchar(255) [null, default: 'Виплата за задачу']
+  amount float [not null]
+  is_removed boolean [default: false]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table WithdrawalRequests {
+  id uuid [pk]
+  user_id uuid [not null, ref: > Users.id]
+  amount float [not null]
+  comment text [null]
+  reason text [null]
+  status withdrawalrequeststatus [not null, default: 'pending']
+  requested_at timestamptz [default: `now()`]
+  processed_at timestamptz [null]
+  paid_at timestamptz [null]
+}
+
+Table WithdrawalLimits {
+  id uuid [pk]
+  user_id uuid [not null, ref: > Users.id]
+  limit_amount float [not null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+//////////////////////////////////////
+// Chat
+//////////////////////////////////////
+
+Table Chats {
+  id uuid [pk]
+  chat_type chattype [not null, default: 'direct']
+  name varchar(200) [null]
+  avatar_url varchar(500) [null]
+  created_by_id uuid [null, ref: > Users.id]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table ChatMembers {
+  id uuid [pk]
+  chat_id uuid [not null, ref: > Chats.id]
+  user_id uuid [not null, ref: > Users.id]
+  role chatmemberrole [not null, default: 'member']
+  last_read_message_id uuid [null, ref: > Messages.id]
+  notifications_enabled boolean [not null, default: true]
+  joined_at timestamptz [not null, default: `now()`]
+}
+
+Table Messages {
+  id uuid [pk]
+  chat_id uuid [not null, ref: > Chats.id]
+  sender_id uuid [null, ref: > Users.id]
+  content text [null]
+  message_type varchar(20) [not null, default: 'text', note: 'text | audio | image | file']
+  attachment_url varchar(500) [null]
+  attachment_name varchar(255) [null]
+  attachment_size integer [null, note: 'bytes']
+  audio_duration integer [null, note: 'seconds']
+  reply_to_id uuid [null, ref: > Messages.id]
+  is_system boolean [not null, default: false]
+  is_deleted boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+//////////////////////////////////////
+// RoVision (public site content)
+//////////////////////////////////////
+
+Table BlogPosts {
+  id uuid [pk]
+  author_id uuid [null, ref: > Users.id]
+  slug varchar(255) [unique, not null]
+  title varchar(255) [not null]
+  summary text [null]
+  content text [not null, note: 'HTML from tiptap']
+  thumbnail_url text [null]
+  category varchar(100) [null]
+  tags "text[]" [null]
+  reading_time varchar(50) [null]
+  is_anonymous boolean [not null, default: false]
+  is_published boolean [not null, default: true]
+  published_at timestamptz [null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table Games {
+  id uuid [pk]
+  slug varchar(255) [unique, not null]
+  title varchar(255) [not null]
+  summary text [null]
+  content text [not null]
+  thumbnail_url text [null]
+  play_url text [null]
+  is_published boolean [not null, default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table Jobs {
+  id uuid [pk]
+  slug varchar(255) [unique, not null]
+  title varchar(255) [not null]
+  description text [not null, note: 'HTML from tiptap']
+  salary varchar(100) [null]
+  location varchar(100) [null]
+  employment_type varchar(100) [null]
+  tags "text[]" [null]
+  apply_url text [null]
+  is_published boolean [not null, default: true]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table News {
+  id uuid [pk]
+  author_id uuid [not null, ref: > Users.id]
+  title varchar(255) [null]
+  content text [not null]
+  labels "text[]" [null]
+  target_text varchar(100) [null]
+  target_url text [null]
+  created_at timestamptz [default: `now()`]
+  updated_at timestamptz [default: `now()`]
+}
+
+Table ContactRequests {
+  id uuid [pk]
+  category varchar(50) [not null]
+  category_label varchar(255) [not null]
+  email varchar(255) [null]
+  phone varchar(50) [null]
+  telegram varchar(100) [null]
+  message text [not null]
+  is_handled boolean [not null, default: false]
+  ip_address varchar(64) [null]
+  user_agent text [null]
+  created_at timestamptz [default: `now()`]
+}
+
+//////////////////////////////////////
+// Dynamic forms
+//////////////////////////////////////
+
+Table Forms {
+  id uuid [pk]
+  author_id uuid [null, ref: > Users.id]
+  slug varchar(200) [unique, not null]
+  title varchar(200) [not null]
+  is_anonymous boolean [default: false]
+  data jsonb [not null]
+  created_at timestamptz [default: `now()`]
+}
+
+Table FormResults {
+  id uuid [pk]
+  form_id uuid [not null, ref: > Forms.id]
+  user_id uuid [null, ref: > Users.id]
+  data jsonb [null]
+  submitted_at timestamptz [default: `now()`]
+}
+
+//////////////////////////////////////
+// VisionBot (Discord)
+//////////////////////////////////////
+
+Table VisionBotGuildSettings {
+  guild_id bigint [pk]
+  language varchar [default: 'uk']
+  on_member_added_roles json [default: '[]']
+  logs_channel_id bigint [null]
+}
+
+Table VisionBotModules {
+  id bigint [pk]
+  server_id bigint
+  name varchar [not null]
+  code text [not null]
+  meta json [default: '{}']
+  status boolean [default: true]
+  created_by bigint [null, note: 'Discord user ID']
+  created_at bigint [null, note: 'epoch timestamp']
+  updated_at bigint [null, note: 'epoch timestamp']
+}
+
+Table VisionBotModuleLogs {
+  id bigint [pk]
+  module_id bigint [not null]
+  server_id bigint [not null]
+  level varchar [not null, note: 'info | warn | error | debug']
+  message text [not null]
+  timestamp timestamptz
+}
+
+Table VisionBotUniversalStore {
+  id bigint [pk]
+  server_id bigint
+  scope varchar [not null]
+  module_id bigint [null]
+  name varchar [not null]
+  key varchar [not null]
+  data_type varchar [not null]
+  value_type varchar [not null]
+  value json [null]
+}
+
+//////////////////////////////////////
+// VisionSupport (Telegram)
+//////////////////////////////////////
+
+Table VisionSupportUsers {
+  telegram_id bigint [pk]
+  username varchar(100) [null]
+  first_name varchar(100) [null]
+  last_name varchar(100) [null]
+  last_message_text text [null]
+  new_messages integer [default: 0]
+  created_at timestamptz [default: `now()`]
+  is_active boolean [not null, default: true]
+}
+
+Table VisionSupportMessages {
+  id uuid [pk]
+  telegram_user_id bigint [not null, ref: > VisionSupportUsers.telegram_id]
+  text text [not null]
+  files "varchar[]" [null]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table VisionSupportAnswers {
+  id uuid [pk]
+  telegram_user_id bigint [not null, ref: > VisionSupportUsers.telegram_id]
+  operator_id uuid [not null, note: 'soft ref -> Users.id (no DB FK)']
+  text text [not null]
+  files "varchar[]" [null]
+  is_sent_to_telegram boolean [not null, default: false]
+  tried_to_send integer [not null, default: 0]
+  created_at timestamptz [not null, default: `now()`]
+  sent_at timestamptz [null]
+}
+
+//////////////////////////////////////
+// Table groups (visual grouping in dbdiagram)
+//////////////////////////////////////
+
+TableGroup "Identity & access" {
+  Users
+  UserRoles
+  Badges
+  UserBadges
+}
+
+TableGroup "Org & events" {
+  OrgStructureNodes
+  Events
+  EventInvites
+}
+
+TableGroup "Drive & knowledge" {
+  DriveFolders
+  DriveFiles
+  KnowledgeFolders
+  KnowledgeDocuments
+  KnowledgeVersions
+  KnowledgeAccess
+}
+
+TableGroup "Kanban" {
+  Boards
+  BoardLists
+  Tasks
+  Subtasks
+  TaskAttachments
+  TaskComments
+  TaskTags
+}
+
+TableGroup "Finance" {
+  Transactions
+  TaskAccruals
+  WithdrawalRequests
+  WithdrawalLimits
+}
+
+TableGroup "Chat" {
+  Chats
+  ChatMembers
+  Messages
+}
+
+TableGroup "Public content" {
+  BlogPosts
+  Games
+  Jobs
+  News
+  ContactRequests
+  Forms
+  FormResults
+}
+
+TableGroup "Bots & support" {
+  VisionBotGuildSettings
+  VisionBotModules
+  VisionBotModuleLogs
+  VisionBotUniversalStore
+  VisionSupportUsers
+  VisionSupportMessages
+  VisionSupportAnswers
+}
+
+TableGroup "System" {
+  UserNotifs
+  Logs
+}

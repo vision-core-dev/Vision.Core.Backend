@@ -7,6 +7,7 @@ class GameFeedPostBaseSchema(PydModel):
     title: str | None = None
     content: str
     is_published: bool = True
+    developer_slug: str | None = None
 
 
 class CreateGameFeedPostRequest(GameFeedPostBaseSchema):
@@ -17,6 +18,7 @@ class UpdateGameFeedPostRequest(PydModel):
     title: str | None = None
     content: str | None = None
     is_published: bool | None = None
+    developer_slug: str | None = None
 
 
 class GameFeedPostResponse(GameFeedPostWithAuthor):

@@ -187,6 +187,7 @@ async def create_game_feed_post(
     post = GameFeedPost(
         game_id=game_id,
         author_id=user.id,
+        developer_slug=data.developer_slug,
         title=data.title,
         content=sanitize_html(data.content),
         is_published=data.is_published,

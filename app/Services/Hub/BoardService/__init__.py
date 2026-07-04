@@ -113,6 +113,11 @@ class BoardService:
         if not board:
             raise HTTPException(status_code=404, detail="board_not_found")
 
+        if not board.is_public:
+            members = board.members or {}
+            if str(user.id) not in members and str(user.id) != str(board.created_by_id):
+                raise HTTPException(status_code=403, detail="permission_denied")
+
         # 🟩 2. Отримуємо учасників (many-to-many)
         users_query = (select(User))
         users_result = await self.db.execute(users_query)

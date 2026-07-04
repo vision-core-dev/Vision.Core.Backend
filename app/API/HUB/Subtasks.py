@@ -25,6 +25,7 @@ async def get_all_subtasks(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
+    await TaskService(db).CheckTaskAccess(task_id, user)
     return await TaskService(db).GetSubtasks(task_id, user)
 
 @subtasks_router.post("/Create")
@@ -37,6 +38,7 @@ async def create_subtask(
     name = payload.get("name")
     if not name:
         raise HTTPException(status_code=400, detail="name_required")
+    await TaskService(db).CheckTaskAccess(task_id, user)
     res = await TaskService(db).CreateSubtask(task_id, name, user)
     # Notify board
     task = await db.get(Task, task_id)
@@ -55,6 +57,7 @@ async def set_subtask_completed(
     is_completed = payload.get("is_completed")
     if is_completed is None:
         raise HTTPException(status_code=400, detail="is_completed_required")
+    await TaskService(db).CheckTaskAccess(task_id, user)
     res = await TaskService(db).SetSubtaskCompleted(task_id, subtask_id, is_completed, user)
     if res.get("board_id"):
         await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})
@@ -71,6 +74,7 @@ async def rename_subtask(
     new_name = payload.get("new_name")
     if not new_name:
         raise HTTPException(status_code=400, detail="new_name_required")
+    await TaskService(db).CheckTaskAccess(task_id, user)
     res = await TaskService(db).RenameSubtask(task_id, subtask_id, new_name, user)
     if res.get("board_id"):
         await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})
@@ -83,6 +87,7 @@ async def delete_subtask(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
+    await TaskService(db).CheckTaskAccess(task_id, user)
     res = await TaskService(db).DeleteSubtask(task_id, subtask_id, user)
     if res.get("board_id"):
         await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})

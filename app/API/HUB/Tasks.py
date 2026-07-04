@@ -20,6 +20,7 @@ tasks_router = APIRouter(prefix="/Tasks", tags=["Tasks"])
 # 🔹 Деталі задачі
 @tasks_router.get("/{task_id}/GetDetails", response_model=TaskDetailsResponse)
 async def get_task_details(task_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    await TaskService(db).CheckTaskAccess(task_id, user)
     return await TaskService(db).GetTaskDetails(task_id, user)
 
 @tasks_router.get("/{task_id}/GetPublicDetails", response_model=TaskDetailsResponse)
@@ -32,6 +33,7 @@ async def assign_user(task_id: uuid.UUID, payload: dict, db: AsyncSession = Depe
     user_id = payload.get("user_id")
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id_required")
+    await TaskService(db).CheckTaskAccess(task_id, user)
     res = await TaskService(db).AssignUser(task_id, uuid.UUID(user_id), current_user=user)
     if res.get("board_id"):
         await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})
@@ -43,6 +45,7 @@ async def unassign_user(task_id: uuid.UUID, payload: dict, db: AsyncSession = De
     user_id = payload.get("user_id")
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id_required")
+    await TaskService(db).CheckTaskAccess(task_id, user)
     res = await TaskService(db).UnassignUser(task_id, uuid.UUID(user_id))
     if res.get("board_id"):
         await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})
@@ -54,6 +57,7 @@ async def assign_tag(task_id: uuid.UUID, payload: dict, db: AsyncSession = Depen
     tag_id = payload.get("tag_id")
     if not tag_id:
         raise HTTPException(status_code=400, detail="tag_id_required")
+    await TaskService(db).CheckTaskAccess(task_id, user)
     res = await TaskService(db).AssignTag(task_id, uuid.UUID(tag_id))
     if res.get("board_id"):
         await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})
@@ -65,6 +69,7 @@ async def unassign_tag(task_id: uuid.UUID, payload: dict, db: AsyncSession = Dep
     tag_id = payload.get("tag_id")
     if not tag_id:
         raise HTTPException(status_code=400, detail="tag_id_required")
+    await TaskService(db).CheckTaskAccess(task_id, user)
     res = await TaskService(db).UnassignTag(task_id, uuid.UUID(tag_id))
     if res.get("board_id"):
         await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})
@@ -73,6 +78,7 @@ async def unassign_tag(task_id: uuid.UUID, payload: dict, db: AsyncSession = Dep
 # 🔹 Архівувати задачу
 @tasks_router.post("/{task_id}/Archive")
 async def archive_task(task_id: uuid.UUID, db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
+    await TaskService(db).CheckTaskAccess(task_id, user)
     res = await TaskService(db).ArchiveTask(task_id, user)
     if res.get("board_id"):
         await _notify_update(res["board_id"], "task_archived", {"task_id": str(task_id)})
@@ -84,6 +90,7 @@ async def update_task_description(task_id: uuid.UUID, payload: dict, db: AsyncSe
     description = payload.get("description")
     if description is None:
         raise HTTPException(status_code=400, detail="description_required")
+    await TaskService(db).CheckTaskAccess(task_id, user)
     res = await TaskService(db).UpdateTaskDescription(task_id, description, user)
     if res.get("board_id"):
         await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})
@@ -95,6 +102,7 @@ async def update_task_name(task_id: uuid.UUID, payload: dict, db: AsyncSession =
     name = payload.get("name")
     if name is None:
         raise HTTPException(status_code=400, detail="name_required")
+    await TaskService(db).CheckTaskAccess(task_id, user)
     res = await TaskService(db).UpdateTaskName(task_id, name, user)
     if res.get("board_id"):
         await _notify_update(res["board_id"], "task_updated", {"task_id": str(task_id)})
@@ -103,6 +111,7 @@ async def update_task_name(task_id: uuid.UUID, payload: dict, db: AsyncSession =
 
 @tasks_router.post("/{task_id}/Attachments/UploadFile")
 async def upload_task_attachment(task_id: uuid.UUID, file: UploadFile = File(...), db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
+    await TaskService(db).CheckTaskAccess(task_id, user)
     return await TaskService(db).UploadFileAttachment(task_id, file, user)
 
 @tasks_router.post("/{task_id}/Attachments/AddLink")
@@ -111,10 +120,12 @@ async def add_task_link_attachment(task_id: uuid.UUID, payload: dict, db: AsyncS
     name = payload.get("name")
     if link_url is None:
         raise HTTPException(status_code=400, detail="link_url_required")
+    await TaskService(db).CheckTaskAccess(task_id, user)
     return await TaskService(db).AddLinkAttachment(task_id, link_url, name, user)
 
 @tasks_router.post("/{task_id}/Attachments/{attachment_id}/Remove")
 async def remove_task_attachment(task_id: uuid.UUID, attachment_id: uuid.UUID, db: AsyncSession = Depends(getdb), user: User = Depends(getuser)):
+    await TaskService(db).CheckTaskAccess(task_id, user)
     return await TaskService(db).RemoveAttachment(task_id, attachment_id, user)
 
 @tasks_router.post("/{task_id}/Attachments/{attachment_id}/Rename")
@@ -122,6 +133,7 @@ async def rename_task_attachment(task_id: uuid.UUID, attachment_id: uuid.UUID, p
     new_name = payload.get("new_name")
     if new_name is None:
         raise HTTPException(status_code=400, detail="new_name_required")
+    await TaskService(db).CheckTaskAccess(task_id, user)
     return await TaskService(db).RenameAttachment(task_id, attachment_id, new_name, user)
 
 
@@ -132,6 +144,7 @@ async def upload_task_banner(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
+    await TaskService(db).CheckTaskAccess(task_id, user)
     return await TaskService(db).UploadTaskBanner(task_id, file, user)
 
 @tasks_router.post("/{task_id}/SetBanner")
@@ -144,6 +157,7 @@ async def set_task_banner(
     banner_url = payload.get("banner_url")
     if not banner_url:
         raise HTTPException(status_code=400, detail="banner_url_required")
+    await TaskService(db).CheckTaskAccess(task_id, user)
     return await TaskService(db).SetTaskBanner(task_id, banner_url, user)
 
 @tasks_router.post("/{task_id}/MoveToList")
@@ -157,6 +171,7 @@ async def move_task_to_list(
     if not list_id:
         raise HTTPException(status_code=400, detail="list_id_required")
     
+    await TaskService(db).CheckTaskAccess(task_id, user)
     res = await TaskService(db).MoveTaskToList(task_id, uuid.UUID(list_id), user)
     
     if res.get("board_id"):
@@ -181,6 +196,7 @@ async def set_task_order(
     list_id = payload.get("list_id")
     if order is None and list_id is None:
         raise HTTPException(status_code=400, detail="new_order_required")
+    await TaskService(db).CheckTaskAccess(task_id, user)
     res = await TaskService(db).SetTaskOrder(task_id, order, list_id, user)
     if res.get("board_id"):
         await _notify_update(res["board_id"], "task_moved", {"task_id": str(task_id)})
@@ -197,6 +213,7 @@ async def update_dates(
     deadline_at = payload.get("deadline_at")
     started_at = payload.get("started_at")
     completed_at = payload.get("completed_at")
+    await TaskService(db).CheckTaskAccess(task_id, user)
     res = await TaskService(db).UpdateTaskDates(
         task_id,
         deadline_at=deadline_at,
@@ -235,6 +252,7 @@ async def create_task_accrual(
     if not user.role or user.role.order > 3:
         raise HTTPException(status_code=403, detail="forbidden")
     
+    await TaskService(db).CheckTaskAccess(task_id, user)
     task = await db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="task_not_found")
@@ -309,6 +327,7 @@ async def update_task_accrual(
     if not user.role or user.role.order > 3:
         raise HTTPException(status_code=403, detail="forbidden")
 
+    await TaskService(db).CheckTaskAccess(task_id, user)
     accrual = await db.get(TaskAccrual, accrual_id)
     if not accrual or accrual.task_id != task_id or accrual.is_removed:
         raise HTTPException(status_code=404, detail="accrual_not_found")
@@ -374,6 +393,7 @@ async def delete_task_accrual(
     if not user.role or user.role.order > 3:
         raise HTTPException(status_code=403, detail="forbidden")
 
+    await TaskService(db).CheckTaskAccess(task_id, user)
     accrual = await db.get(TaskAccrual, accrual_id)
     if not accrual or accrual.task_id != task_id:
         raise HTTPException(status_code=404, detail="accrual_not_found")

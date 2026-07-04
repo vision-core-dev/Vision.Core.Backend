@@ -27,6 +27,22 @@ class TaskService:
         self.db = db
         self._notify = NotifyService(db)
 
+    async def CheckTaskAccess(self, task_id: uuid.UUID, user: User) -> Task:
+        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalar_one_or_none()
+        if not task:
+            raise HTTPException(status_code=404, detail="task_not_found")
+        
+        board = await self.db.get(Board, task.board_id)
+        if not board:
+            raise HTTPException(status_code=404, detail="board_not_found")
+        
+        if not board.is_public:
+            members = board.members or {}
+            if str(user.id) not in members and str(user.id) != str(board.created_by_id):
+                raise HTTPException(status_code=403, detail="permission_denied")
+        return task
+
     async def GetTaskDetails(self, task_id: uuid.UUID, user: User) -> TaskDetailsResponse:
         # 🔹 1. Отримуємо задачу
         result = await self.db.execute(

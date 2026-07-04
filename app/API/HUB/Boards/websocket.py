@@ -102,6 +102,7 @@ manager = BoardConnectionManager()
 async def board_websocket(
     websocket: WebSocket,
     board_id: uuid.UUID,
+    token: uuid.UUID | None = None,
     db: AsyncSession = Depends(getdb)
 ):
     """
@@ -111,6 +112,37 @@ async def board_websocket(
     - Client -> Server: {"type": "ping"} or {"type": "user_identify", "user": {...}}
     - Server -> Client: {"type": "board_update", "data": {...}} or {"type": "user_presence", "users": [...]}
     """
+    from app.Objects.tasks.BoardModel import Board
+    from app.Services.Hub.AuthService.depends import _get_user_by_token
+
+    board = await db.get(Board, board_id)
+    if not board:
+        await websocket.accept()
+        await websocket.send_json({"type": "error", "message": "board_not_found"})
+        await websocket.close(code=4004)
+        return
+
+    if not board.is_public:
+        if not token:
+            await websocket.accept()
+            await websocket.send_json({"type": "error", "message": "missing_authentication_token"})
+            await websocket.close(code=4001)
+            return
+        try:
+            user = await _get_user_by_token(db, token)
+        except Exception:
+            await websocket.accept()
+            await websocket.send_json({"type": "error", "message": "invalid_token"})
+            await websocket.close(code=4003)
+            return
+
+        members = board.members or {}
+        if str(user.id) not in members and str(user.id) != str(board.created_by_id):
+            await websocket.accept()
+            await websocket.send_json({"type": "error", "message": "permission_denied"})
+            await websocket.close(code=4003)
+            return
+
     board_id_str = str(board_id)
     user_info = None
     

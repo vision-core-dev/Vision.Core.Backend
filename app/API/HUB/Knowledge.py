@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.Infrastructure.Database import getdb
-from app.Services.Hub.AuthService.depends import getuser, getuser_check_me
+from app.Services.Hub.AuthService.depends import getuser, getuser_check_me, require_role
 from app.Objects.UserModel import User
 from app.Services.Hub.KnowledgeService import KnowledgeService
 
@@ -49,6 +49,7 @@ async def create_document(
     db: AsyncSession = Depends(getdb),
     user: User = Depends(getuser),
 ):
+    require_role(user, 1)
     service = KnowledgeService(db)
     doc = await service.create_document(
         title=title,
@@ -67,6 +68,7 @@ async def create_document_version(
     db: AsyncSession = Depends(getdb),
     user: User = Depends(getuser),
 ):
+    require_role(user, 1)
     service = KnowledgeService(db)
     version = await service.create_version(
         document_id=doc_id,
@@ -189,6 +191,7 @@ async def update_document(
     db: AsyncSession = Depends(getdb),
     user: User = Depends(getuser),
 ):
+    require_role(user, 1)
     service = KnowledgeService(db)
     await service.update_document(doc_id, payload.title)
     version = await service.create_version(
@@ -206,6 +209,7 @@ async def get_document_versions(
     db: AsyncSession = Depends(getdb),
     user: User = Depends(getuser),
 ):
+    require_role(user, 1)
     service = KnowledgeService(db)
     versions = await service.get_document_versions(doc_id)
 

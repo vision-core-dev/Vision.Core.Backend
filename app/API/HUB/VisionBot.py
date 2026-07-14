@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.Infrastructure.Database import getdb
-from app.Services.Hub.AuthService.depends import getuser
+from app.Services.Hub.AuthService.depends import getuser, require_role
 from app.Services.VisionBotService import VisionBotService
 
 from app.Services.VisionBotService.dtos import (
@@ -78,6 +78,7 @@ async def update_guild_settings(
     user=Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
+    require_role(user, 2)
     updated = await VisionBotService(db).update_guild_settings(
         guild_id,
         **{k: v for k, v in payload.dict().items() if v is not None}
@@ -130,6 +131,7 @@ async def update_module(
     user=Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
+    require_role(user, 2)
     updated = await VisionBotService(db).update_module(
         module_id,
         **{k: v for k, v in payload.dict().items() if v is not None}
@@ -146,6 +148,7 @@ async def delete_module(
     user=Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
+    require_role(user, 2)
     await VisionBotService(db).delete_module(module_id)
     return {"status": "ok"}
 
@@ -214,6 +217,7 @@ async def set_store_item(
     user=Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
+    require_role(user, 2)
     item = await VisionBotService(db).set_store_item(**payload.dict())
 
     return UniversalStoreItemDTO.model_validate(
@@ -227,5 +231,6 @@ async def delete_store_item(
     user=Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
+    require_role(user, 2)
     await VisionBotService(db).delete_store_item(item_id)
     return {"status": "ok"}

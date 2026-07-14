@@ -1,3 +1,5 @@
+import os
+import secrets
 from typing import Optional
 
 from bson import ObjectId
@@ -11,7 +13,9 @@ from app.API.RoVision.Hangout.game_data import HangoutUserData
 from app.Infrastructure.Mongo import getrvhmongo
 
 hangout_data_router = APIRouter()
-hangout_token = "HEyd6U7!5T3$7nTbyq$wWVfvAbjAV*h#mqaZ3TdfV6HUVe6FgbPpGfCAYAz7yyAP"
+# Shared secret for the Roblox game server. Set HANGOUT_TOKEN in the environment;
+# never commit it. If unset, the endpoints fail closed (503).
+hangout_token = os.getenv("HANGOUT_TOKEN")
 
 class GetUserDataRequest(BaseModel):
     rbx_user_id: Optional[int] = None
@@ -28,6 +32,13 @@ async def _token(
     authorization: str | None = Header(None)
 ) -> bool:
 
+    # Fail closed if the secret isn't configured — never fall back to "open".
+    if not hangout_token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="hangout_auth_not_configured"
+        )
+
     raw_token = None
 
     if authorization:
@@ -36,7 +47,8 @@ async def _token(
         else:
             raw_token = authorization.strip()
 
-    if raw_token == hangout_token:
+    # Constant-time comparison to avoid token-guessing via timing.
+    if raw_token and secrets.compare_digest(raw_token, hangout_token):
         return True
 
     raise HTTPException(

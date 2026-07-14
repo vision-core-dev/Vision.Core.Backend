@@ -12,24 +12,27 @@ from app.Objects.JobSchemas import (
     JobResponse,
     ListJobsResponse,
 )
-from app.Services.Hub.AuthService.depends import getuser
+from app.Services.Hub.AuthService.depends import getuser, require_role
 from app.Services.RoVision.content import sanitize_html
 
 jobs_router = APIRouter(prefix="/Jobs", tags=["RoVision > Jobs"])
 
 
 def check_permission(user: User):
-    if not user.role or user.role.order not in [0, 1, 2, 3, 4, 5, 6]:
-        raise HTTPException(status_code=403, detail="Тільки CEO/COO можуть керувати вакансіями")
+    # Content management is restricted to managers and above (order <= 3).
+    require_role(user, 3)
 
 
 # ---------- Public ----------
 
 @jobs_router.get("/List", response_model=ListJobsResponse)
-async def list_jobs(db: AsyncSession = Depends(getdb), include_unpublished: bool = False):
-    stmt = select(Job).order_by(desc(Job.created_at))
-    if not include_unpublished:
-        stmt = stmt.where(Job.is_published.is_(True))
+async def list_jobs(db: AsyncSession = Depends(getdb)):
+    # Public endpoint: only published jobs, never expose drafts.
+    stmt = (
+        select(Job)
+        .where(Job.is_published.is_(True))
+        .order_by(desc(Job.created_at))
+    )
     result = await db.execute(stmt)
     return {"items": result.scalars().all()}
 

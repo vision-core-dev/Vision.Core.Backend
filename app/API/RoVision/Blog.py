@@ -15,25 +15,28 @@ from app.Objects.BlogPostSchemas import (
 from pydantic import BaseModel
 import os
 import openai
-from app.Services.Hub.AuthService.depends import getuser
+from app.Services.Hub.AuthService.depends import getuser, require_role
 from app.Services.RoVision.content import sanitize_html, estimate_reading_time
 
 blog_router = APIRouter(prefix="/Blog", tags=["RoVision > Blog"])
 
 
 def check_permission(user: User):
-    if not user.role or user.role.order not in [0, 1, 2, 3, 4, 5, 6]:
-        raise HTTPException(status_code=403, detail="Тільки CEO/COO можуть керувати блогом")
+    # Content management is restricted to managers and above (order <= 3).
+    require_role(user, 3)
 
 
 # ---------- Public ----------
 
 @blog_router.get("/List", response_model=ListBlogPostsResponse)
-async def list_posts(db: AsyncSession = Depends(getdb), include_unpublished: bool = False):
-    stmt = select(BlogPost).order_by(desc(BlogPost.created_at))
-    if not include_unpublished:
-        stmt = stmt.where(BlogPost.is_published.is_(True))
-        stmt = stmt.where((BlogPost.published_at.is_(None)) | (BlogPost.published_at <= func.now()))
+async def list_posts(db: AsyncSession = Depends(getdb)):
+    # Public endpoint: only published, non-embargoed posts. No draft exposure.
+    stmt = (
+        select(BlogPost)
+        .where(BlogPost.is_published.is_(True))
+        .where((BlogPost.published_at.is_(None)) | (BlogPost.published_at <= func.now()))
+        .order_by(desc(BlogPost.created_at))
+    )
     result = await db.execute(stmt)
     return {"items": result.scalars().all()}
 

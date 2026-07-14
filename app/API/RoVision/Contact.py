@@ -15,7 +15,7 @@ from app.Objects.ContactRequestSchemas import (
     ListContactRequestsResponse,
     UpdateContactRequest,
 )
-from app.Services.Hub.AuthService.depends import getuser
+from app.Services.Hub.AuthService.depends import getuser, require_role
 
 contact_router = APIRouter(prefix="/Contact", tags=["RoVision > Contact"])
 
@@ -59,8 +59,8 @@ async def _send_webhook(payload: dict) -> None:
 
 
 def check_permission(user: User):
-    if not user.role or user.role.order not in [0, 1, 2, 3, 4, 5, 6]:
-        raise HTTPException(status_code=403, detail="Тільки авторизовані користувачі можуть переглядати звернення")
+    # Contact submissions carry PII (email/phone/IP) — restrict to management (order <= 2).
+    require_role(user, 2)
 
 
 def _client_ip(request: Request) -> str | None:

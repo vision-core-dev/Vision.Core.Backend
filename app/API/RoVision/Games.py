@@ -20,14 +20,14 @@ from app.Objects.GameFeedPostSchemas import (
     GameFeedPostResponse,
     ListGameFeedPostsResponse,
 )
-from app.Services.Hub.AuthService.depends import getuser
+from app.Services.Hub.AuthService.depends import getuser, require_role
 from app.Services.RoVision.content import sanitize_html
 
 games_router = APIRouter(prefix="/Games", tags=["RoVision", "Games"])
 
 def check_permission(user: User):
-    if not user.role or user.role.order not in [0, 1, 2, 3, 4, 5, 6]:
-        raise HTTPException(status_code=403, detail="Forbidden")
+    # Content management is restricted to managers and above (order <= 3).
+    require_role(user, 3)
 
 # ---------- Admin ----------
 

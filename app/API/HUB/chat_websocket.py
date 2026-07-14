@@ -10,6 +10,7 @@ from datetime import datetime
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.Infrastructure.Database import async_session
+from app.Services.Hub.AuthService.depends import _get_user_by_token
 from app.Services.Hub.ChatService import ChatService
 
 chat_ws_router = APIRouter()
@@ -170,33 +171,43 @@ async def chat_websocket(websocket: WebSocket):
             message = json.loads(data)
             
             if message.get("type") == "identify":
-                user_id = message.get("user_id")
-                user_name = message.get("user_name", "Користувач")
-                
-                if not user_id:
-                    await websocket.send_json({"type": "error", "message": "user_id required"})
-                    await websocket.close()
+                # Authenticate via bearer session token — the client-supplied
+                # user_id is NOT trusted; identity is derived from the token.
+                token_str = message.get("token")
+                if not token_str:
+                    await websocket.send_json({"type": "error", "message": "token required"})
+                    await websocket.close(code=1008)
                     return
-                
-                # Register connection
-                if user_id not in chat_manager.user_connections:
-                    chat_manager.user_connections[user_id] = set()
-                
-                chat_manager.user_connections[user_id].add(websocket)
-                chat_manager.ws_to_user[websocket] = user_id
-                
-                print(f"✅ [Chat WS] User {user_id} ({user_name}) identified and connected")
-                
-                # Load user's chats and register them - use temporary session
+
                 async with async_session() as db:
+                    try:
+                        auth_user = await _get_user_by_token(db, uuid.UUID(str(token_str)))
+                    except Exception:
+                        await websocket.send_json({"type": "error", "message": "invalid token"})
+                        await websocket.close(code=1008)
+                        return
+
+                    user_id = str(auth_user.id)
+                    user_name = auth_user.first_name or "Користувач"
+
+                    # Register connection
+                    if user_id not in chat_manager.user_connections:
+                        chat_manager.user_connections[user_id] = set()
+
+                    chat_manager.user_connections[user_id].add(websocket)
+                    chat_manager.ws_to_user[websocket] = user_id
+
+                    print(f"✅ [Chat WS] User {user_id} ({user_name}) authenticated and connected")
+
+                    # Load user's chats and register them (same session)
                     service = ChatService(db)
                     try:
-                        user_chats = await service.get_user_chats(uuid.UUID(user_id))
+                        user_chats = await service.get_user_chats(auth_user.id)
                         for chat in user_chats:
                             chat_manager.register_user_to_chat(user_id, str(chat.id))
                     except Exception as e:
                         print(f"[Chat WS] Error loading user chats: {e}")
-                
+
                 # Send confirmation
                 await websocket.send_json({
                     "type": "connected",

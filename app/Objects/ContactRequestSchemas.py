@@ -40,6 +40,7 @@ class ContactRequestResponse(PydModel):
     created_at: datetime
     ip_address: str | None = None
     user_agent: str | None = None
+    user_id: uuid.UUID | None = None
 
 
 class ListContactRequestsResponse(BaseModel):

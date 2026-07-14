@@ -10,6 +10,19 @@ from app.Objects.UserModel import User
 
 
 
+def get_role_order(user: User) -> int | None:
+    """Return the user's role rank (lower = more privileged), or None if roleless."""
+    return user.role.order if user.role else None
+
+
+def require_role(user: User, max_order: int) -> None:
+    """Authorize by role rank. Raise 403 unless the user has a role whose
+    `order` is <= max_order (lower order = higher privilege; 0 = CEO)."""
+    order = get_role_order(user)
+    if order is None or order > max_order:
+        raise HTTPException(status_code=403, detail="insufficient_permissions")
+
+
 async def get_token(
     authorization: str | None = Header(None)
 ) -> uuid.UUID:

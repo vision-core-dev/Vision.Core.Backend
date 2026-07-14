@@ -5,7 +5,7 @@ import uuid
 
 from app.Infrastructure.Database import getdb
 from app.Objects.UserModel import User, UserRoleBase, UserRole, UserRoleCreate, UserRoleUpdate
-from app.Services.Hub.AuthService.depends import getuser
+from app.Services.Hub.AuthService.depends import getuser, require_role
 
 user_roles_router = APIRouter(prefix="/UserRoles", tags=["Hub > UserRoles"])
 
@@ -29,6 +29,9 @@ async def get_all_roles(user: User = Depends(getuser), db: AsyncSession = Depend
 
 @user_roles_router.post("", response_model=UserRoleBase)
 async def create_role(data: UserRoleCreate, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    # Only the top-tier (CEO, order 0) may manage roles — a role's `order` is the
+    # privilege field, so anyone able to edit it can self-promote.
+    require_role(user, 0)
     new_role = UserRole(**data.model_dump())
     db.add(new_role)
     await db.commit()
@@ -37,24 +40,26 @@ async def create_role(data: UserRoleCreate, user: User = Depends(getuser), db: A
 
 @user_roles_router.patch("/{role_id}", response_model=UserRoleBase)
 async def update_role(role_id: uuid.UUID, data: UserRoleUpdate, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    require_role(user, 0)
     role = await db.get(UserRole, role_id)
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
-    
+
     update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(role, key, value)
-        
+
     await db.commit()
     await db.refresh(role)
     return role
 
 @user_roles_router.delete("/{role_id}")
 async def delete_role(role_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    require_role(user, 0)
     role = await db.get(UserRole, role_id)
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
-        
+
     await db.delete(role)
     await db.commit()
     return {"status": "ok"}

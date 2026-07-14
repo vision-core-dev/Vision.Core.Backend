@@ -26,6 +26,8 @@ class ContactRequest(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    user_id = Column(UUID(as_uuid=True), nullable=True)
+
 
 class ContactRequestBase(PydModel):
     id: uuid.UUID
@@ -38,4 +40,27 @@ class ContactRequestBase(PydModel):
     is_handled: bool = False
     ip_address: str | None = None
     user_agent: str | None = None
+    created_at: datetime
+    user_id: uuid.UUID | None = None
+
+
+class ContactRequestMessage(Base):
+    __tablename__ = "ContactRequestMessages"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=func.gen_random_uuid())
+    request_id = Column(UUID(as_uuid=True), nullable=False)
+    sender_id = Column(UUID(as_uuid=True), nullable=False)
+    sender_name = Column(String(255), nullable=False)
+    message = Column(TEXT, nullable=False)
+    is_deleted = Column(Boolean, nullable=False, default=False, server_default="false")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ContactRequestMessageResponse(PydModel):
+    id: uuid.UUID
+    request_id: uuid.UUID
+    sender_id: uuid.UUID
+    sender_name: str
+    message: str
+    is_deleted: bool = False
     created_at: datetime

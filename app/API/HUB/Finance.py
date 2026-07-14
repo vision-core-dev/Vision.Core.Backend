@@ -14,7 +14,7 @@ from app.Objects.finance.TransactionModel import Transaction, TransactionType
 from app.Objects.finance.WithdrawalLimitModel import WithdrawalLimitModel
 from app.Objects.finance.WithdrawalRequestModel import WithdrawalRequest, WithdrawalRequestStatus
 from app.Objects.tasks.TaskModel import Task
-from app.Services.Hub.AuthService.depends import getuser
+from app.Services.Hub.AuthService.depends import getuser, require_role
 from app.Services.Hub.NotifyService import NotifyService
 
 finance_router = APIRouter(prefix="/Finance", tags=["Hub > Finance"])
@@ -228,9 +228,10 @@ async def get_transactions_list(
     page: int = Query(1, ge=1),
     limit: int = Query(30, le=100),
     search: str | None = None,
-    user: User = Depends(getuser), 
+    user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
+    require_role(user, 2)
     query = select(Transaction).where(Transaction.is_removed == False)
     
     if search:
@@ -290,6 +291,7 @@ async def create_transaction(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
+    require_role(user, 2)
     ids = []
     kyiv_tz = pytz.timezone("Europe/Kyiv")
 
@@ -355,6 +357,7 @@ async def update_transaction(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
+    require_role(user, 2)
     transaction_id = data.get("transaction_id")
     if not transaction_id:
         raise HTTPException(status_code=400, detail="transaction_id_required")
@@ -400,6 +403,7 @@ async def delete_transaction(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
+    require_role(user, 2)
     transaction_id = data.get("transaction_id")
     if not transaction_id:
         raise HTTPException(status_code=400, detail="transaction_id_required")
@@ -444,6 +448,7 @@ async def approve_withdrawal_request(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
+    require_role(user, 2)
     request_id = data.get("request_id")
     if not request_id:
         raise HTTPException(status_code=400, detail="request_id_required")
@@ -454,6 +459,10 @@ async def approve_withdrawal_request(
     request = request_res.scalar_one_or_none()
     if not request:
         raise HTTPException(status_code=404, detail="withdrawal_request_not_found")
+
+    # Separation of duty: you cannot approve your own withdrawal request.
+    if request.user_id == user.id:
+        raise HTTPException(status_code=403, detail="cannot_approve_own_request")
 
     if request.status != WithdrawalRequestStatus.PENDING:
         raise HTTPException(status_code=400, detail="withdrawal_request_not_pending")
@@ -473,6 +482,7 @@ async def reject_withdrawal_request(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
+    require_role(user, 2)
     request_id = data.get("request_id")
     reason = data.get("reason", "No reason provided")
     if not request_id:
@@ -512,6 +522,7 @@ async def get_unwithdrawn_list(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
+    require_role(user, 2)
     # 🟢 1. Отримуємо всіх активних юзерів
     users_result = await db.execute(
         select(User).order_by(User.created_at.asc())
@@ -619,6 +630,7 @@ async def get_leaderboard(user: User = Depends(getuser), db: AsyncSession = Depe
 
 @finance_router.get("/GetStats")
 async def get_finance_stats(user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    require_role(user, 2)
     """
     Фінансова статистика:
     - Дохід робітників = income - deduction

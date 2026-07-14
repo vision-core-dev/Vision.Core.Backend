@@ -13,14 +13,14 @@ from app.Objects.DeveloperSchemas import (
     DeveloperResponse,
     ListDevelopersResponse,
 )
-from app.Services.Hub.AuthService.depends import getuser
+from app.Services.Hub.AuthService.depends import getuser, require_role
 
 developers_router = APIRouter(prefix="/Developers", tags=["RoVision", "Developers"])
 
 
 def check_permission(user: User):
-    if not user.role or user.role.order not in [0, 1, 2, 3, 4, 5, 6]:
-        raise HTTPException(status_code=403, detail="Forbidden")
+    # Content management is restricted to managers and above (order <= 3).
+    require_role(user, 3)
 
 
 def _validate_type(value: str | None) -> None:

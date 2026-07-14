@@ -10,6 +10,8 @@ from app.Objects.UserModel import User, UserRole, UserPreview
 from app.Objects.finance.TransactionModel import Transaction
 from app.Objects.tasks.TaskModel import Task, TaskStatus
 from app.Services.Hub.AuthService import AuthService, get_hashed_password
+from app.Services.Hub.AuthService.utils import check_password
+from app.Services.Hub.AuthService.depends import require_role
 from app.Services.Hub.UserService.contracts import (
     UsersListResponse,
     UsersPublicListResponse,
@@ -239,7 +241,8 @@ class UserService:
 
         actor_role = await self.db.get(UserRole, actor.role_id)
 
-        if user.role.order < actor_role.order:
+        # Must strictly outrank the target — same-tier peers cannot be deactivated.
+        if actor_role is None or user.role is None or user.role.order <= actor_role.order:
             raise HTTPException(status_code=403, detail="insufficient_permissions")
 
         user.is_active = False
@@ -256,7 +259,8 @@ class UserService:
 
         actor_role = await self.db.get(UserRole, actor.role_id)
 
-        if user.role.order < actor_role.order:
+        # Must strictly outrank the target — same-tier peers cannot be reactivated.
+        if actor_role is None or user.role is None or user.role.order <= actor_role.order:
             raise HTTPException(status_code=403, detail="insufficient_permissions")
 
         user.is_active = True
@@ -265,6 +269,7 @@ class UserService:
         return ActivateUserResponse(user_id=user.id)
 
     async def AddSupervisor(self, user_id: uuid.UUID, supervisor_id: uuid.UUID, actor: User):
+        require_role(actor, 2)
         user = await self.db.get(User, user_id)
         supervisor = await self.db.get(User, supervisor_id)
         if not user or not supervisor:
@@ -276,6 +281,7 @@ class UserService:
         return await self.GetUserDetails(user_id, actor)
 
     async def RemoveSupervisor(self, user_id: uuid.UUID, supervisor_id: uuid.UUID, actor: User):
+        require_role(actor, 2)
         user = await self.db.get(User, user_id)
         if not user:
             raise HTTPException(status_code=404, detail="user_not_found")
@@ -285,6 +291,7 @@ class UserService:
         return await self.GetUserDetails(user_id, actor)
 
     async def AddSubordinate(self, user_id: uuid.UUID, subordinate_id: uuid.UUID, actor: User):
+        require_role(actor, 2)
         subordinate = await self.db.get(User, subordinate_id)
         if not subordinate:
             raise HTTPException(status_code=404, detail="user_not_found")
@@ -294,6 +301,7 @@ class UserService:
         return await self.GetUserDetails(user_id, actor)
 
     async def RemoveSubordinate(self, user_id: uuid.UUID, subordinate_id: uuid.UUID, actor: User):
+        require_role(actor, 2)
         subordinate = await self.db.get(User, subordinate_id)
         if not subordinate:
             raise HTTPException(status_code=404, detail="user_not_found")
@@ -302,16 +310,20 @@ class UserService:
         await self.db.commit()
         return await self.GetUserDetails(user_id, actor)
 
-    async def ChangeUserPassword(self, user_id: uuid.UUID, new_password: str, actor: User):
+    async def ChangeUserPassword(self, user_id: uuid.UUID, new_password: str, actor: User, current_password: str | None = None):
         user = await self.db.get(User, user_id)
         if not user:
             raise HTTPException(status_code=404, detail="user_not_found")
 
-        actor_role = await self.db.get(UserRole, actor.role_id)
-        target_role = await self.db.get(UserRole, user.role_id)
-
-        if actor.id != user_id:
-            if target_role.order < actor_role.order:
+        if actor.id == user_id:
+            # Changing your own password requires proving you know the current one.
+            if not current_password or not user.hashed_password or not check_password(current_password, user.hashed_password):
+                raise HTTPException(status_code=403, detail="invalid_current_password")
+        else:
+            # Resetting another user's password requires strictly outranking them.
+            actor_role = await self.db.get(UserRole, actor.role_id)
+            target_role = await self.db.get(UserRole, user.role_id)
+            if actor_role is None or target_role is None or actor_role.order >= target_role.order:
                 raise HTTPException(status_code=403, detail="insufficient_permissions")
 
         if len(new_password) < 8:
@@ -322,4 +334,5 @@ class UserService:
         user.temp_token = uuid.uuid4()
         await self.db.commit()
 
-        return {"user_id": user.id, "new_password": new_password}
+        # Do NOT echo the plaintext password back in the response.
+        return {"user_id": user.id, "status": "password_changed"}

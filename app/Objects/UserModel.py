@@ -161,7 +161,7 @@ class UserBase(PydModel):
     avatar_url: str | None
     birthday: datetime | None
     is_active: bool
-    temp_token: uuid.UUID | None
+    # temp_token intentionally NOT exposed — it is the bearer credential.
     last_login: datetime | None
     created_at: datetime
     updated_at: datetime | None = None

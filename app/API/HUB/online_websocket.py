@@ -11,6 +11,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.Infrastructure.Database import getdb
+from app.Services.Hub.AuthService.depends import _get_user_by_token
 
 online_ws_router = APIRouter()
 
@@ -140,12 +141,21 @@ async def online_users_websocket(
             message = json.loads(data)
             
             if message.get("type") == "identify":
-                user_id = message.get("user_id")
-                if not user_id:
-                    await websocket.send_json({"type": "error", "message": "user_id required"})
-                    await websocket.close()
+                # Authenticate via bearer session token — client-supplied user_id
+                # is NOT trusted; identity is derived from the token.
+                token_str = message.get("token")
+                if not token_str:
+                    await websocket.send_json({"type": "error", "message": "token required"})
+                    await websocket.close(code=1008)
                     return
-                
+                try:
+                    auth_user = await _get_user_by_token(db, uuid.UUID(str(token_str)))
+                except Exception:
+                    await websocket.send_json({"type": "error", "message": "invalid token"})
+                    await websocket.close(code=1008)
+                    return
+                user_id = str(auth_user.id)
+
                 # Register connection
                 if user_id not in online_manager.connections:
                     online_manager.connections[user_id] = set()

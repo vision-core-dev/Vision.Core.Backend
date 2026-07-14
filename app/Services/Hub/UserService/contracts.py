@@ -85,3 +85,5 @@ class DetailsUserResponse(BaseModel):
 
 class ChangeUserPasswordRequest(BaseModel):
     new_password: str
+    # Required when a user changes their OWN password (verifies identity).
+    current_password: Optional[str] = None

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.Infrastructure.Database import getdb
-from app.Services.Hub.AuthService.depends import getuser
+from app.Services.Hub.AuthService.depends import getuser, require_role
 from app.Services.Hub.OrgStructureService import OrgStructureService
 from app.Objects.OrgStructureSchemas import (
     OrgNodeCreate,
@@ -83,8 +83,9 @@ async def create_node(
     - project: Проект (потрібна назва)
     - user: Користувач (потрібен user_id)
     """
+    require_role(user, 2)
     service = OrgStructureService(db)
-    
+
     try:
         node = await service.create_node(data)
     except ValueError as e:
@@ -101,8 +102,9 @@ async def update_node(
     user: User = Depends(getuser),
 ):
     """Оновити вузол"""
+    require_role(user, 2)
     service = OrgStructureService(db)
-    
+
     try:
         node = await service.update_node(uuid.UUID(node_id), data)
     except ValueError as e:
@@ -124,8 +126,9 @@ async def delete_node(
     Якщо cascade=true, видаляє всі дочірні вузли рекурсивно.
     Якщо cascade=false і є діти, повертає помилку.
     """
+    require_role(user, 2)
     service = OrgStructureService(db)
-    
+
     try:
         await service.delete_node(uuid.UUID(node_id), cascade=cascade)
     except ValueError as e:
@@ -147,8 +150,9 @@ async def move_node(
     new_parent_id: ID нового батьківського вузла (null для кореня)
     new_order: Новий порядок серед сусідів
     """
+    require_role(user, 2)
     service = OrgStructureService(db)
-    
+
     try:
         new_parent_uuid = uuid.UUID(data.new_parent_id) if data.new_parent_id else None
         node = await service.move_node(uuid.UUID(node_id), new_parent_uuid, data.new_order)

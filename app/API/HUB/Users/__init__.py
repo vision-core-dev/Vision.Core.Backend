@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.Infrastructure.Database import getdb
 from app.Objects.UserModel import User
-from app.Services.Hub.AuthService.depends import getuser
+from app.Services.Hub.AuthService.depends import getuser, require_role
+from app.Objects.UserModel import UserRole
 from app.Services.Hub.UserService import UserService
 from app.Services.Hub.UserService.contracts import CreateUserResponse, UsersListResponse, UsersPublicListResponse, UserDetailsResponse, \
     CreateUserRequest, ChangeUserPasswordRequest
@@ -33,12 +34,27 @@ async def create_user(
     user: User = Depends(getuser),
     db: AsyncSession = Depends(getdb)
 ):
+    # Only the user-management tier may create accounts.
+    require_role(user, 2)
+
+    # Prevent privilege escalation: the requested role must be strictly less
+    # privileged than the actor's own role (higher order = lower privilege).
+    if data.role_id is not None:
+        new_role = await db.get(UserRole, data.role_id)
+        if not new_role:
+            raise HTTPException(status_code=404, detail="role_not_found")
+        if user.role is None or new_role.order <= user.role.order:
+            raise HTTPException(status_code=403, detail="insufficient_permissions")
+
     return await UserService(db).CreateUser(data.email, data.password, data.first_name, data.role_id)
 
 
 # 👤 Деталі користувача
 @users_router.get("/{user_id}/Details", response_model=UserDetailsResponse)
 async def get_user(user_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
+    # Own details are always allowed; viewing others requires a manager+ role.
+    if user.id != user_id:
+        require_role(user, 3)
     return await UserService(db).GetUserDetails(user_id, user)
 
 
@@ -53,8 +69,8 @@ async def delete_user(user_id: uuid.UUID, user: User = Depends(getuser), db: Asy
 @users_router.post("/{user_id}/ChangePassword", dependencies=[Depends(HTTPBearer(auto_error=False))])
 async def reset_user_password(user_id: uuid.UUID, data: ChangeUserPasswordRequest, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):
     if not data.new_password:
-        return HTTPException(status_code=400, detail="no_new_password")
-    return await UserService(db).ChangeUserPassword(user_id, data.new_password, user)
+        raise HTTPException(status_code=400, detail="no_new_password")
+    return await UserService(db).ChangeUserPassword(user_id, data.new_password, user, data.current_password)
 
 @users_router.post("/{user_id}/ResetPassword", dependencies=[Depends(HTTPBearer(auto_error=False))])
 async def admin_reset_password(user_id: uuid.UUID, user: User = Depends(getuser), db: AsyncSession = Depends(getdb)):

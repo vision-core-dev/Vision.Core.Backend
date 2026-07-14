@@ -62,6 +62,13 @@ class AuthService:
             await self.db.commit()
             await self.db.refresh(user)
 
+        # Guarantee a valid session token — a NULL temp_token would serialize to
+        # the literal string "None" and break every authenticated request.
+        if not user.temp_token:
+            user.temp_token = uuid.uuid4()
+            await self.db.commit()
+            await self.db.refresh(user)
+
         return LoginResponse(token=str(user.temp_token))
 
     async def CheckMe(self, user: User) -> CheckMeResponse:
@@ -162,6 +169,10 @@ class AuthService:
             user.role_id = str(default_role.id)
 
         await self._sync_avatar_from_oauth(user, info)
+
+        # Guarantee a valid session token (see Login) — never return "None".
+        if not user.temp_token:
+            user.temp_token = uuid.uuid4()
 
         user.last_login = func.now()
         await self.db.commit()

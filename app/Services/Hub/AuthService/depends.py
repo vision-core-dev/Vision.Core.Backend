@@ -44,8 +44,11 @@ async def get_token(
     try:
         token_uuid = uuid.UUID(str(raw_token))
     except Exception:
+        # A malformed token is an authentication failure (401), not a client
+        # bad-request — this lets the frontend's 401 logout flow handle stale
+        # or corrupt tokens uniformly instead of leaving the user stuck.
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid_token_format"
         )
 
